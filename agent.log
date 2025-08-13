@@ -1,0 +1,140 @@
+2025-08-13 00:21:01,579 - __main__ - INFO - Log level set to: INFO
+2025-08-13 00:21:01,680 - __main__ - INFO - Starting agent with config: AgentConfig(mode=local, server_url=None, host=0.0.0.0, port=9000)
+2025-08-13 00:21:01,680 - __main__ - INFO - Initializing agent...
+2025-08-13 00:21:01,680 - wiring - INFO - LocalTemscriptFactory created
+2025-08-13 00:21:01,684 - wiring - ERROR - Failed to create local microscope: [WinError -2147221164] 没有注册类
+2025-08-13 00:21:01,685 - wiring - ERROR - Failed to connect to microscope: Failed to create local microscope: [WinError -2147221164] 没有注册类
+2025-08-13 00:21:01,685 - __main__ - ERROR - Failed to connect to microscope
+2025-08-13 00:21:01,685 - __main__ - ERROR - Failed to connect to microscope
+2025-08-13 00:21:01,686 - __main__ - ERROR - Failed to initialize agent
+2025-08-13 00:21:01,686 - __main__ - INFO - Shutting down agent...
+2025-08-13 00:21:01,686 - __main__ - INFO - Agent shutdown completed
+2025-08-13 02:23:03,695 - __main__ - INFO - Log level set to: INFO
+2025-08-13 02:23:03,802 - __main__ - INFO - Starting agent with config: AgentConfig(mode=null, server_url=None, host=0.0.0.0, port=9000)
+2025-08-13 02:23:03,802 - __main__ - INFO - Initializing agent...
+2025-08-13 02:23:03,802 - wiring - INFO - NullMicroscopeFactory created
+2025-08-13 02:23:03,802 - wiring - ERROR - Failed to create null microscope: GunState.__init__() got an unexpected keyword argument 'voltage'
+2025-08-13 02:23:03,803 - wiring - ERROR - Failed to connect to microscope: Failed to create null microscope: GunState.__init__() got an unexpected keyword argument 'voltage'
+2025-08-13 02:23:03,803 - __main__ - ERROR - Failed to connect to microscope
+2025-08-13 02:23:03,803 - __main__ - ERROR - Failed to connect to microscope
+2025-08-13 02:23:03,803 - __main__ - ERROR - Failed to initialize agent
+2025-08-13 02:23:03,803 - __main__ - INFO - Shutting down agent...
+2025-08-13 02:23:03,803 - __main__ - INFO - Agent shutdown completed
+2025-08-13 02:27:13,523 - __main__ - INFO - Log level set to: INFO
+2025-08-13 02:27:13,628 - __main__ - INFO - Starting agent with config: AgentConfig(mode=null, server_url=None, host=0.0.0.0, port=9000)
+2025-08-13 02:27:13,628 - __main__ - INFO - Initializing agent...
+2025-08-13 02:27:13,629 - wiring - INFO - NullMicroscopeFactory created
+2025-08-13 02:27:13,629 - wiring - ERROR - Failed to create null microscope: VacuumState.__init__() got an unexpected keyword argument 'pressure'
+2025-08-13 02:27:13,629 - wiring - ERROR - Failed to connect to microscope: Failed to create null microscope: VacuumState.__init__() got an unexpected keyword argument 'pressure'
+2025-08-13 02:27:13,629 - __main__ - ERROR - Failed to connect to microscope
+2025-08-13 02:27:13,629 - __main__ - ERROR - Failed to connect to microscope
+2025-08-13 02:27:13,629 - __main__ - ERROR - Failed to initialize agent
+2025-08-13 02:27:13,630 - __main__ - INFO - Shutting down agent...
+2025-08-13 02:27:13,630 - __main__ - INFO - Agent shutdown completed
+2025-08-13 02:27:43,394 - __main__ - INFO - Log level set to: INFO
+2025-08-13 02:27:43,500 - __main__ - INFO - Starting agent with config: AgentConfig(mode=null, server_url=None, host=0.0.0.0, port=9000)
+2025-08-13 02:27:43,500 - __main__ - INFO - Initializing agent...
+2025-08-13 02:27:43,500 - wiring - INFO - NullMicroscopeFactory created
+2025-08-13 02:27:43,501 - ports_temscript - INFO - Null microscope simulator initialized
+2025-08-13 02:27:43,501 - wiring - INFO - Null microscope simulator created successfully
+2025-08-13 02:27:43,501 - wiring - INFO - Successfully connected to null microscope
+2025-08-13 02:27:43,501 - __main__ - INFO - Connected to microscope: Unknown
+2025-08-13 02:27:43,501 - __main__ - INFO - Agent initialized successfully
+2025-08-13 02:27:43,505 - server_fastapi - INFO - Microscope wiring set successfully, mode: null
+2025-08-13 02:27:43,506 - __main__ - INFO - Starting server on 0.0.0.0:9000
+2025-08-13 02:27:43,506 - __main__ - INFO - Mode: null
+2025-08-13 02:27:43,542 - server_fastapi - INFO - Starting ZhouTomo API Server...
+2025-08-13 02:27:45,756 - __main__ - INFO - Received signal 2, initiating shutdown...
+2025-08-13 02:27:45,756 - __main__ - INFO - Received signal 2, initiating shutdown...
+2025-08-13 02:27:45,756 - __main__ - INFO - Shutting down agent...
+2025-08-13 02:27:45,756 - __main__ - INFO - Agent shutdown completed
+2025-08-13 02:27:45,757 - __main__ - INFO - Shutting down agent...
+2025-08-13 02:27:45,757 - __main__ - INFO - Agent shutdown completed
+2025-08-13 02:27:45,757 - __main__ - INFO - Shutting down agent...
+2025-08-13 02:27:45,757 - __main__ - INFO - Agent shutdown completed
+2025-08-13 13:38:10,478 - __main__ - INFO - Log level set to: INFO
+2025-08-13 13:38:10,590 - __main__ - INFO - Starting agent with config: AgentConfig(mode=null, server_url=None, host=0.0.0.0, port=9000)
+2025-08-13 13:38:10,591 - __main__ - INFO - Initializing agent...
+2025-08-13 13:38:10,591 - wiring - INFO - NullMicroscopeFactory created
+2025-08-13 13:38:10,591 - ports_temscript - INFO - Null microscope simulator initialized
+2025-08-13 13:38:10,591 - wiring - INFO - Null microscope simulator created successfully
+2025-08-13 13:38:10,591 - wiring - INFO - Successfully connected to null microscope
+2025-08-13 13:38:10,591 - __main__ - INFO - Connected to microscope: Unknown
+2025-08-13 13:38:10,591 - __main__ - INFO - Agent initialized successfully
+2025-08-13 13:38:10,595 - server_fastapi - INFO - Microscope wiring set successfully, mode: null
+2025-08-13 13:38:10,595 - __main__ - INFO - Starting server on 0.0.0.0:9000
+2025-08-13 13:38:10,595 - __main__ - INFO - Mode: null
+2025-08-13 13:38:10,633 - server_fastapi - INFO - Starting ZhouTomo API Server...
+2025-08-13 13:38:46,621 - ports_temscript - INFO - Started acquisition
+2025-08-13 13:38:51,532 - ports_temscript - INFO - Started acquisition
+2025-08-13 13:38:55,693 - ports_temscript - INFO - Set acq_image_size to 4
+2025-08-13 13:38:55,693 - ports_temscript - INFO - Set dwell_time to 2.0
+2025-08-13 13:38:55,693 - ports_temscript - INFO - Set brightness to 45.0
+2025-08-13 13:38:55,694 - ports_temscript - INFO - Set contrast to 45.0
+2025-08-13 13:38:55,694 - ports_temscript - INFO - Set binnings to 4
+2025-08-13 13:38:55,694 - ports_temscript - INFO - Set frames to 1
+2025-08-13 13:38:55,694 - server_fastapi - INFO - 成功更新 acquisition 参数
+2025-08-13 13:38:56,389 - ports_temscript - INFO - Started acquisition
+2025-08-13 13:39:46,459 - ports_temscript - INFO - Set acq_image_size to 4
+2025-08-13 13:39:46,459 - ports_temscript - INFO - Set dwell_time to 2.0
+2025-08-13 13:39:46,459 - ports_temscript - INFO - Set brightness to 45.0
+2025-08-13 13:39:46,459 - ports_temscript - INFO - Set contrast to 45.0
+2025-08-13 13:39:46,459 - ports_temscript - INFO - Set binnings to 4
+2025-08-13 13:39:46,459 - ports_temscript - INFO - Set frames to 3
+2025-08-13 13:39:46,461 - server_fastapi - INFO - 成功更新 acquisition 参数
+2025-08-13 13:39:48,320 - ports_temscript - INFO - Started acquisition
+2025-08-13 14:00:39,921 - ports_temscript - INFO - Started acquisition
+2025-08-13 14:00:55,277 - ports_temscript - INFO - Set acq_image_size to 16
+2025-08-13 14:00:55,277 - ports_temscript - INFO - Set dwell_time to 2.0
+2025-08-13 14:00:55,277 - ports_temscript - INFO - Set brightness to 45.0
+2025-08-13 14:00:55,277 - ports_temscript - INFO - Set contrast to 45.0
+2025-08-13 14:00:55,277 - ports_temscript - INFO - Set binnings to 4
+2025-08-13 14:00:55,277 - ports_temscript - INFO - Set frames to 3
+2025-08-13 14:00:55,278 - server_fastapi - INFO - 成功更新 acquisition 参数
+2025-08-13 14:00:56,406 - ports_temscript - INFO - Started acquisition
+2025-08-13 14:01:14,747 - ports_temscript - INFO - Started acquisition
+2025-08-13 14:06:05,172 - ports_temscript - INFO - Set acq_image_size to 16
+2025-08-13 14:06:05,172 - ports_temscript - INFO - Set dwell_time to 2.0
+2025-08-13 14:06:05,172 - ports_temscript - INFO - Set brightness to 45.0
+2025-08-13 14:06:05,172 - ports_temscript - INFO - Set contrast to 45.0
+2025-08-13 14:06:05,172 - ports_temscript - INFO - Set binnings to 4
+2025-08-13 14:06:05,173 - ports_temscript - INFO - Set frames to 3
+2025-08-13 14:06:05,173 - server_fastapi - INFO - 成功更新 acquisition 参数
+2025-08-13 14:06:05,744 - ports_temscript - INFO - Started acquisition
+2025-08-13 14:06:47,615 - ports_temscript - INFO - Set acq_image_size to 4
+2025-08-13 14:06:47,615 - ports_temscript - INFO - Set dwell_time to 2.0
+2025-08-13 14:06:47,615 - ports_temscript - INFO - Set brightness to 45.0
+2025-08-13 14:06:47,615 - ports_temscript - INFO - Set contrast to 45.0
+2025-08-13 14:06:47,615 - ports_temscript - INFO - Set binnings to 4
+2025-08-13 14:06:47,615 - ports_temscript - INFO - Set frames to 3
+2025-08-13 14:06:47,615 - server_fastapi - INFO - 成功更新 acquisition 参数
+2025-08-13 14:06:48,826 - ports_temscript - INFO - Started acquisition
+2025-08-13 14:07:00,214 - ports_temscript - INFO - Started acquisition
+2025-08-13 14:25:39,591 - ports_temscript - INFO - Started acquisition
+2025-08-13 14:40:50,012 - ports_temscript - INFO - Started acquisition
+2025-08-13 14:55:49,608 - ports_temscript - INFO - Started acquisition
+2025-08-13 14:57:19,033 - ports_temscript - INFO - Started acquisition
+2025-08-13 14:59:49,173 - ports_temscript - INFO - Started acquisition
+2025-08-13 15:37:58,022 - ports_temscript - INFO - Started acquisition
+2025-08-13 15:38:28,319 - ports_temscript - INFO - Started acquisition
+2025-08-13 15:38:38,439 - ports_temscript - INFO - Started acquisition
+2025-08-13 15:39:12,286 - ports_temscript - INFO - Started acquisition
+2025-08-13 15:49:34,971 - server_fastapi - INFO - Shutting down ZhouTomo API Server...
+2025-08-13 15:49:34,972 - __main__ - INFO - Received signal 2, initiating shutdown...
+2025-08-13 15:49:34,972 - __main__ - INFO - Shutting down agent...
+2025-08-13 15:49:34,972 - __main__ - INFO - Agent shutdown completed
+2025-08-13 15:49:34,972 - __main__ - INFO - Shutting down agent...
+2025-08-13 15:49:34,972 - __main__ - INFO - Agent shutdown completed
+2025-08-13 15:49:38,652 - __main__ - INFO - Log level set to: INFO
+2025-08-13 15:49:38,757 - __main__ - INFO - Starting agent with config: AgentConfig(mode=null, server_url=None, host=0.0.0.0, port=9000)
+2025-08-13 15:49:38,757 - __main__ - INFO - Initializing agent...
+2025-08-13 15:49:38,757 - wiring - INFO - NullMicroscopeFactory created
+2025-08-13 15:49:38,757 - ports_temscript - INFO - Null microscope simulator initialized
+2025-08-13 15:49:38,757 - wiring - INFO - Null microscope simulator created successfully
+2025-08-13 15:49:38,759 - wiring - INFO - Successfully connected to null microscope
+2025-08-13 15:49:38,759 - __main__ - INFO - Connected to microscope: Unknown
+2025-08-13 15:49:38,759 - __main__ - INFO - Agent initialized successfully
+2025-08-13 15:49:38,762 - server_fastapi - INFO - Microscope wiring set successfully, mode: null
+2025-08-13 15:49:38,762 - __main__ - INFO - Starting server on 0.0.0.0:9000
+2025-08-13 15:49:38,762 - __main__ - INFO - Mode: null
+2025-08-13 15:49:38,799 - server_fastapi - INFO - Starting ZhouTomo API Server...

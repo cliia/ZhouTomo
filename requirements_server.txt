@@ -1,0 +1,28 @@
+# Server/backend environment requirements python 3.10.17
+# Target: the machine running FastAPI + microscope agent server
+
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+
+# I/O and websockets
+aiofiles>=23.0.0
+websockets>=12.0
+
+# Numeric/image (if server does processing or encodes frames)
+numpy>=1.24.0
+pillow>=10.0.0
+
+# Optional: vendor TEM scripting (if running on microscope PC)
+# Uncomment if needed on the server side
+temscript>=1.0.0
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.7.0
+
+
+# Logging utilities
+python-json-logger>=2.0.0
+

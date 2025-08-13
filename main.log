@@ -1,0 +1,132 @@
+2025-08-13 13:38:44,263 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 13:38:44,264 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 13:38:53,483 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000002AFCC832A70>
+2025-08-13 13:38:53,483 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000002AFCA7698A0>, 347618.296)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000002AFCC8475E0>
+2025-08-13 13:38:53,484 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 13:38:56,386 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000002AFCA722BF0>
+2025-08-13 13:38:56,387 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000002AFCA72C6A0>, 347622.312)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000002AFCA720B50>
+2025-08-13 13:38:56,387 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 13:39:46,457 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000002AFCA7B5F60>
+2025-08-13 13:39:46,457 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000002AFCA72DF00>, 347623.015)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000002AFCA78DF60>
+2025-08-13 13:39:46,458 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 13:39:48,319 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000002AFCA723D00>
+2025-08-13 13:39:48,319 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000002AFCA6B22C0>, 347673.078)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000002AFCA7232E0>
+2025-08-13 13:39:48,319 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:00:30,455 - asyncio - ERROR - Exception in callback _ProactorBasePipeTransport._call_connection_lost(None)
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost(None)>
+Traceback (most recent call last):
+  File "C:\Users\47675\anaconda3\envs\PyQt5\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Users\47675\anaconda3\envs\PyQt5\lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。
+2025-08-13 14:00:39,284 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 14:00:39,284 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:00:53,038 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x0000017FAB847910>
+2025-08-13 14:00:53,039 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x0000017FAB821600>, 348926.562)])']
+connector: <aiohttp.connector.TCPConnector object at 0x0000017FAB847820>
+2025-08-13 14:00:53,039 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:00:56,404 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x0000017FA3059480>
+2025-08-13 14:00:56,404 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x0000017FAB821A80>, 348941.89)])']
+connector: <aiohttp.connector.TCPConnector object at 0x0000017FA30594B0>
+2025-08-13 14:00:56,404 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:01:14,270 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 14:01:14,271 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:06:03,634 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 14:06:03,634 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:06:04,184 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001E971BB7B20>
+2025-08-13 14:06:04,185 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001E971B91B40>, 349250.25)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001E971BB7130>
+2025-08-13 14:06:04,185 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:06:05,742 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001E971BE16C0>
+2025-08-13 14:06:05,742 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001E971B934C0>, 349251.781)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001E971BE16F0>
+2025-08-13 14:06:05,743 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:06:47,613 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001E971BB7AC0>
+2025-08-13 14:06:47,613 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001E971B93AC0>, 349252.359)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001E971BB7FA0>
+2025-08-13 14:06:47,613 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:06:48,824 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001E971BE1900>
+2025-08-13 14:06:48,825 - asyncio - ERROR - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001E96FAD5FC0>, 349294.218)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001E971BE1B40>
+2025-08-13 14:06:48,825 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:06:58,198 - agent_client - WARNING - Request failed, retrying... (1/3)
+2025-08-13 14:25:29,811 - asyncio - ERROR - Exception in callback _ProactorBasePipeTransport._call_connection_lost(None)
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost(None)>
+Traceback (most recent call last):
+  File "C:\Users\47675\anaconda3\envs\PyQt5\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Users\47675\anaconda3\envs\PyQt5\lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。
+2025-08-13 14:25:39,133 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 14:25:39,134 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:30:32,762 - asyncio - ERROR - Exception in callback _ProactorBasePipeTransport._call_connection_lost(None)
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost(None)>
+Traceback (most recent call last):
+  File "C:\Users\47675\anaconda3\envs\PyQt5\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Users\47675\anaconda3\envs\PyQt5\lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。
+2025-08-13 14:40:49,423 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 14:40:49,423 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:55:49,140 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 14:55:49,140 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:57:18,598 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 14:57:18,598 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:59:32,156 - asyncio - ERROR - Exception in callback _ProactorBasePipeTransport._call_connection_lost(None)
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost(None)>
+Traceback (most recent call last):
+  File "C:\Users\47675\anaconda3\envs\PyQt5\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Users\47675\anaconda3\envs\PyQt5\lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。
+2025-08-13 14:59:40,077 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 14:59:40,078 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 14:59:48,362 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 14:59:48,362 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 15:33:22,431 - asyncio - ERROR - Exception in callback _ProactorBasePipeTransport._call_connection_lost(None)
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost(None)>
+Traceback (most recent call last):
+  File "C:\Users\47675\anaconda3\envs\PyQt5\lib\asyncio\events.py", line 80, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Users\47675\anaconda3\envs\PyQt5\lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。
+2025-08-13 15:33:29,816 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 15:33:29,816 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 15:34:01,583 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 15:34:01,583 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 15:37:57,251 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 15:37:57,251 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 15:38:27,767 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 15:38:27,768 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-13 15:38:36,432 - agent_client - WARNING - Request failed, retrying... (1/3)
+2025-08-13 15:39:11,372 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-13 15:39:11,372 - agent_client - INFO - HTTP session (re)created for current event loop

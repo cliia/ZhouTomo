@@ -1,0 +1,26 @@
+# ZhouTomo项目依赖包
+# 核心依赖
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+
+# 可选依赖（根据运行模式）
+temscript>=1.0.0  # 本地模式需要，通常由FEI/Thermo Fisher提供
+
+# 开发依赖
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.7.0
+
+# 日志和配置
+python-json-logger>=2.0.0
+
+# 图像处理（可选）
+pillow>=10.0.0
+numpy>=1.24.0
+
+# 网络和序列化
+websockets>=12.0
+aiofiles>=23.0.0

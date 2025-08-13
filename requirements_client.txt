@@ -1,0 +1,22 @@
+# Client/UI environment requirements python 3.10.17
+# Target: the machine running the PyQt5 GUI
+
+# GUI and event loop
+PyQt5>=5.15.0
+qasync>=0.24.0
+
+# Plotting and analysis (Matplotlib canvas, histogram/FFT)
+matplotlib>=3.8.0
+numpy>=1.24.0
+
+# Image utilities (optional but recommended)
+pillow>=10.0.0
+
+# Networking (HTTP/WebSocket) for AgentClient
+aiohttp>=3.8.0
+websockets>=12.0
+
+# Logging helpers (optional)
+python-json-logger>=2.0.0
+opencv-python>=4.10.0
+

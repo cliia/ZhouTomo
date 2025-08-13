@@ -1,0 +1,13 @@
+"filename", "language", "Python", "comment", "blank", "total"
+"f:\ZhouTomo\ZhouTomo_v2\debug_spinbox.py", "Python", -85, -7, -18, -110
+"f:\ZhouTomo\ZhouTomo_v2\src\BM3D_Main.py", "Python", 98, 3, 20, 121
+"f:\ZhouTomo\ZhouTomo_v2\src\ROI.py", "Python", 290, 4, 46, 340
+"f:\ZhouTomo\ZhouTomo_v2\src\__init__.py", "Python", 0, 0, 1, 1
+"f:\ZhouTomo\ZhouTomo_v2\src\autoFocusProcessor.py", "Python", 192, 17, 49, 258
+"f:\ZhouTomo\ZhouTomo_v2\src\create_loose_mask.py", "Python", 48, 1, 11, 60
+"f:\ZhouTomo\ZhouTomo_v2\src\estimate_bm3d.py", "Python", 83, 5, 15, 103
+"f:\ZhouTomo\ZhouTomo_v2\src\imgaussfilt.py", "Python", 8, 0, 4, 12
+"f:\ZhouTomo\ZhouTomo_v2\src\normxcorr2.py", "Python", 57, 16, 14, 87
+"f:\ZhouTomo\ZhouTomo_v2\src\utils.py", "Python", 62, 4, 19, 85
+"f:\ZhouTomo\ZhouTomo_v2\view\main_window.py", "Python", -17, 16, 0, -1
+"Total", "-", 736, 59, 161, 956
