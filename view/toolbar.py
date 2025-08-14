@@ -283,7 +283,13 @@ class MainToolbar(QWidget):
     def execute_auto_tilt(self):
         """执行自动倾转"""
         self.statusUpdate.emit("正在执行自动倾转...")
-        print("执行自动倾转操作")
+        try:
+            if hasattr(self.parent_window, 'on_auto_tilt_requested'):
+                self.parent_window.on_auto_tilt_requested()
+            else:
+                print("执行自动倾转操作")
+        except Exception:
+            print("执行自动倾转操作")
 
     # 新增：选择目标执行与设置（设置同执行，弹出可能由主窗口实现）
     def execute_select_target(self):

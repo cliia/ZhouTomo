@@ -65,11 +65,7 @@ class InfoPanel(QWidget):
         self.tabs.addTab(hist_tab, "Histogram")
         self.tabs.addTab(fft_tab, "FFT")
 
-        # 中部信息（自动化信息）：改为显示 Focus Curve，取代原电镜信息文本
-        mid_title = QLabel("自动化信息")
-        mid_title.setStyleSheet("QLabel { font-weight: bold; font-size: 12px; padding: 4px; background:#e0e0e0; border:1px solid #cccccc; }")
-
-        # Focus curve figure (defocus vs definition)
+        # Focus curve figure (defocus vs definition) - AF 面板内容
         self.focus_figure = Figure(figsize=(3, 2), dpi=100)
         self.focus_canvas = FigureCanvas(self.focus_figure)
         self.focus_ax = self.focus_figure.add_subplot(111)
@@ -88,22 +84,60 @@ class InfoPanel(QWidget):
         self._focus_x = []
         self._focus_y = []
 
-        # 组装中部容器（标题 + Focus Curve + ROI 预览）
-        mid_container = QWidget()
-        mid_layout = QVBoxLayout(mid_container)
-        mid_layout.setContentsMargins(0, 0, 0, 0)
-        mid_layout.setSpacing(0)
-        mid_layout.addWidget(mid_title)
-        mid_layout.addWidget(self.focus_canvas, 3)
-
-        # ROI 预览（复刻旧版 sample figure）
+        # ROI 预览（复刻旧版 sample figure） - AF 面板内容
         self.roi_figure = Figure(figsize=(3, 1.5), dpi=100)
         self.roi_canvas = FigureCanvas(self.roi_figure)
         self.roi_ax = self.roi_figure.add_subplot(111)
         self.roi_ax.axis('off')
         self.roi_figure.patch.set_facecolor('none')
         self.roi_ax.set_facecolor(colors.LIGHT_BACKGROUND)
-        mid_layout.addWidget(self.roi_canvas, 2)
+
+        # ----- 中部：改为 TabWidget，包含 AF 与 AT 两个子页 -----
+        self.automation_tabs = QTabWidget()
+        self.automation_tabs.setTabPosition(QTabWidget.North)
+        self.automation_tabs.setContentsMargins(0, 0, 0, 0)
+        self.automation_tabs.setStyleSheet(f"""
+            QTabWidget {{ background-color: {colors.DARK_BACKGROUND}; border: 0px; color: {colors.TEXT_NORMAL}; font-family: Microsoft YaHei; font-size: 12px; font-weight: bold; }}
+            QTabWidget::pane {{ border: 1px solid {colors.BORDER_COLOR}; top: -1px; margin: 0px; padding: 0px; }}
+            QStackedWidget {{ background-color: {colors.DARK_BACKGROUND}; border: 0px; margin: 0px; padding: 0px; }}
+            QTabBar::tab {{ background-color: {colors.DARK_BACKGROUND}; border: 1px solid {colors.BORDER_COLOR}; color: {colors.TEXT_NORMAL}; font-family: Microsoft YaHei; font-size: 12px; font-weight: bold; padding: 5px 10px; }}
+            QTabBar::tab:selected {{ background-color: {colors.BUTTON_HOVER}; color: {colors.TEXT_NORMAL}; }}
+            QTabBar::tab:hover {{ background-color: {colors.BUTTON_HOVER}; color: {colors.TEXT_NORMAL}; }}
+        """)
+
+        # AF 子页
+        af_tab = QWidget()
+        af_layout = QVBoxLayout(af_tab)
+        af_layout.setContentsMargins(0, 0, 0, 0)
+        af_layout.setSpacing(4)
+        af_layout.addWidget(self.focus_canvas, 3)
+        af_layout.addWidget(self.roi_canvas, 2)
+
+        # AT 子页：显示当前 alpha 与对焦状态
+        at_tab = QWidget()
+        at_layout = QVBoxLayout(at_tab)
+        at_layout.setContentsMargins(8, 8, 8, 8)
+        at_layout.setSpacing(8)
+        row1 = QHBoxLayout();
+        lbl_alpha_title = QLabel("当前 Alpha (°)：");
+        lbl_alpha_title.setStyleSheet("QLabel { font-weight: bold; }")
+        self.at_alpha_label = QLabel("-")
+        row1.addWidget(lbl_alpha_title)
+        row1.addWidget(self.at_alpha_label)
+        row1.addStretch()
+        row2 = QHBoxLayout();
+        lbl_status_title = QLabel("对焦状态：");
+        lbl_status_title.setStyleSheet("QLabel { font-weight: bold; }")
+        self.at_status_label = QLabel("-")
+        row2.addWidget(lbl_status_title)
+        row2.addWidget(self.at_status_label)
+        row2.addStretch()
+        at_layout.addLayout(row1)
+        at_layout.addLayout(row2)
+        at_layout.addStretch()
+
+        self.automation_tabs.addTab(af_tab, "Auto Focus")
+        self.automation_tabs.addTab(at_tab, "Auto Tilt")
 
         # 底部：设备关键参数监视（两列表格：键 | 值）
         keys = [
@@ -151,7 +185,7 @@ class InfoPanel(QWidget):
         # 使用垂直分割器组织三部分：顶部 tabs / 中部曲线 / 底部表格
         splitter = QSplitter(Qt.Vertical)
         splitter.addWidget(self.tabs)
-        splitter.addWidget(mid_container)
+        splitter.addWidget(self.automation_tabs)
         splitter.addWidget(self.kv_table)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 4)
@@ -289,6 +323,21 @@ class InfoPanel(QWidget):
             self.roi_ax.cla(); self.roi_ax.axis('off')
             self.roi_ax.imshow(arr, cmap='gray')
             self.roi_canvas.draw_idle()
+        except Exception:
+            pass
+
+    # ---------- Auto Tilt 面板 API ----------
+    def set_autotilt_alpha(self, alpha_deg: float):
+        try:
+            if hasattr(self, 'at_alpha_label'):
+                self.at_alpha_label.setText(f"{float(alpha_deg):.2f}")
+        except Exception:
+            pass
+
+    def set_autotilt_status(self, status_text: str):
+        try:
+            if hasattr(self, 'at_status_label'):
+                self.at_status_label.setText(str(status_text))
         except Exception:
             pass
 

@@ -763,6 +763,16 @@ class AutoTiltSettingsPopup(BasePopup):
         self.alpha_step.setFixedHeight(self.LINE_HEIGHT)
         grid.addWidget(self.alpha_step, 2, 1)
 
+        # HR 放大倍率
+        lbl_hrmag = QLabel("HR放大倍率：")
+        lbl_hrmag.setFixedWidth(110)
+        lbl_hrmag.setAlignment(Qt.AlignRight)
+        grid.addWidget(lbl_hrmag, 3, 0, Qt.AlignRight)
+        self.hr_magnification = QLineEdit("")
+        self.hr_magnification.setPlaceholderText("例如：11000000")
+        self.hr_magnification.setFixedHeight(self.LINE_HEIGHT)
+        grid.addWidget(self.hr_magnification, 3, 1)
+
         # 操作按钮：新增/删除下一个转角程序
         btns = QHBoxLayout()
         self.btn_add = QPushButton("新增程序")
@@ -904,6 +914,8 @@ class AutoTiltSettingsPopup(BasePopup):
             result = {
                 "programs": programs_out,
                 "sequence": merged,
+                # 若未填写则置为 None，由主流程回退到当前倍率或目标快照倍率
+                "hr_magnification": (float(self.hr_magnification.text()) if self.hr_magnification.text().strip() else None),
             }
             # 不关闭弹窗时也可读取
             # 持久化已定义的程序，确保下次打开依然显示

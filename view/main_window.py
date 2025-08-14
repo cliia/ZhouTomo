@@ -22,6 +22,7 @@ try:
     from autofocus.config import AutofocusSettings
     from autofocus.microscope_api import MicroscopeAPI
     from autofocus.controller import AutofocusController
+    from autotilt.controller import AutoTiltController, AutoTiltSettings
 except ImportError:
     # 如果无法导入资源管理器，创建一个简单的替代版本
     class SimpleResourceManager:
@@ -659,6 +660,21 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.status_bar.showMessage(f"保存自动聚焦参数失败: {e}")
 
+    # 接收自动倾转参数并存储
+    def on_autotilt_settings_selected(self, data):
+        try:
+            if not data:
+                return
+            dm = self._ensure_data_model()
+            dm['autotilt_settings'] = data
+            seq = data.get('sequence', []) if isinstance(data, dict) else []
+            hrm = data.get('hr_magnification', None)
+            self.status_bar.showMessage(
+                f"自动倾转参数已保存: 角度数={len(seq)}, HR倍率={hrm if hrm else '未设置'}"
+            )
+        except Exception as e:
+            self.status_bar.showMessage(f"保存自动倾转参数失败: {e}")
+
     # 执行自动聚焦
     def on_auto_focus_requested(self):
         """执行自动聚焦"""
@@ -733,12 +749,94 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.status_bar.showMessage(f"启动自动聚焦失败: {e}")
 
-    def _on_focus_metric(self, defocus_um: float, definition_value: float, step_idx: int):
+    # 执行自动倾转
+    def on_auto_tilt_requested(self):
         try:
-            if hasattr(self, 'info_panel') and self.info_panel:
-                self.info_panel.append_focus_point(defocus_um, definition_value)
-        except Exception:
-            pass
+            self.status_bar.showMessage("正在执行自动倾转...")
+            # 1) 取得选中的目标 target_id
+            target_id = None
+            if hasattr(self, 'file_panel') and self.file_panel and hasattr(self.file_panel, 'list'):
+                flist = self.file_panel.list
+                for i in range(flist.count()):
+                    item = flist.item(i)
+                    widget = flist.itemWidget(item)
+                    if widget and hasattr(widget, 'radio') and widget.radio.isChecked():
+                        target_id = item.data(Qt.UserRole)
+                        break
+            if not target_id:
+                self.status_bar.showMessage("请先在左侧选择一个目标（单选框）")
+                return
+            dm = self._ensure_data_model()
+            target_models = dm.get('target_models', {})
+            if target_id not in target_models:
+                self.status_bar.showMessage("内部错误：未找到目标数据模型")
+                return
+            target_model = target_models[target_id]
+            # 2) 读取自动倾转参数 + 自动聚焦参数
+            at_cfg = AutoTiltSettings.from_dict(dm.get('autotilt_settings', {}))
+            af_cfg_dict = dm.get('autofocus_settings', {})
+            # 3) 显微镜 API + 控制器
+            if not hasattr(self, 'agent_manager') or not self.agent_manager:
+                self.status_bar.showMessage("未连接显微镜，无法执行自动倾转")
+                return
+            api = MicroscopeAPI(self.agent_manager)
+            controller = AutoTiltController(api, target_model, at_cfg, af_cfg_dict, parent=self)
+            self._at_controller = controller
+            # 4) 连接信号更新 UI
+            controller.frame.connect(lambda arr: self.image_panel.set_image_array(arr) if hasattr(self, 'image_panel') and self.image_panel else None)
+            controller.progress.connect(lambda step, msg: self.status_bar.showMessage(f"[AT] {step}: {msg}"))
+            # 同步当前 alpha & 对焦状态显示：在 progress 回调里解析 alpha 文本
+            def _on_at_progress(step, msg):
+                self.status_bar.showMessage(f"[AT] {step}: {msg}")
+                try:
+                    if hasattr(self, 'info_panel') and self.info_panel and 'alpha=' in str(msg):
+                        import re
+                        m = re.search(r"alpha=([\-0-9\.]+)", str(msg))
+                        if m:
+                            self.info_panel.set_autotilt_alpha(float(m.group(1)))
+                except Exception:
+                    pass
+            controller.progress.disconnect()
+            controller.progress.connect(_on_at_progress)
+            controller.error.connect(lambda msg: self.status_bar.showMessage(f"自动倾转错误: {msg}"))
+            def on_finish(ok, info):
+                if ok:
+                    self.status_bar.showMessage("自动倾转完成")
+                else:
+                    self.status_bar.showMessage(f"自动倾转失败: {info}")
+            controller.finished.connect(on_finish)
+            # 5) 启动
+            controller.start()
+        except Exception as e:
+            self.status_bar.showMessage(f"启动自动倾转失败: {e}")
+
+    def _on_export_tilt_series_requested(self, target_id: str):
+        try:
+            if not target_id:
+                return
+            dm = self._ensure_data_model()
+            tm = dm.get('target_models', {}).get(target_id)
+            if tm is None:
+                self.status_bar.showMessage("未找到目标数据")
+                return
+            import numpy as np
+            alphas = np.array(getattr(tm, 'tilt_alpha_series', []) or [], dtype=np.float32)
+            globals_stack = [gi.image for gi in getattr(tm, 'tilt_global_series', []) if getattr(gi, 'image', None) is not None]
+            hrs_stack = [hi.image for hi in getattr(tm, 'tilt_highres_series', []) if getattr(hi, 'image', None) is not None]
+            if not len(alphas):
+                self.status_bar.showMessage("该目标暂无倾转数据")
+                return
+            from PyQt5.QtWidgets import QFileDialog
+            path, _ = QFileDialog.getSaveFileName(self, "保存倾转序列", f"{tm.name}_tilt_series.npz", "Numpy Zip (*.npz)")
+            if not path:
+                return
+            np.savez_compressed(path,
+                                alpha=alphas,
+                                globals=np.array(globals_stack, dtype=object),
+                                highs=np.array(hrs_stack, dtype=object))
+            self.status_bar.showMessage(f"已保存倾转序列到: {path}")
+        except Exception as e:
+            self.status_bar.showMessage(f"保存倾转序列失败: {e}")
 
     # def open_autofocus_settings(self):
     #     """打开自动聚焦参数设置弹窗，并保存参数到数据模型"""
@@ -1133,6 +1231,11 @@ class MainWindow(QMainWindow):
         # 双击目标 -> 显示其 GlobalImage
         try:
             self.file_panel.list.itemDoubleClicked.connect(self._on_file_item_double_clicked)
+        except Exception:
+            pass
+        # 右键菜单导出倾转序列
+        try:
+            self.file_panel.targetExportTiltSeries.connect(self._on_export_tilt_series_requested)
         except Exception:
             pass
         
