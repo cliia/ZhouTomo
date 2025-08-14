@@ -5,8 +5,8 @@ Matplotlib 图像画布，用于显示图像并支持矩形框选（数据坐标
 """
 
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer
+from PyQt5.QtWidgets import QWidget, QMenu
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPoint
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -51,6 +51,7 @@ class ImageCanvas(FigureCanvas):
         self._draw_timer.timeout.connect(self._on_draw_timeout)
 
         self._current_image = None  # numpy.ndarray (H, W) 或 (H, W, C)
+        self._latest_snapshot = None  # 最近一次快照（来自主窗体转发）
 
     def set_image(self, image_array: np.ndarray):
         """显示图像（numpy 数组）"""
@@ -66,15 +67,31 @@ class ImageCanvas(FigureCanvas):
             self._figure.subplots_adjust(left=0, right=1, bottom=0, top=1)
             self._axes.set_position([0, 0, 1, 1])
 
-        # 归一化显示：8-bit 直接显示；16-bit 则线性映射到0-1
+        # 归一化显示：
+        # - uint16: 线性映射到 0-1
+        # - uint8: 直接按 0-255 显示
+        # - 其他整型/浮点: 使用分位数(1%-99%)做鲁棒线性映射，避免全白/全黑
         arr = image_array
         h, w = arr.shape[0], arr.shape[1]
         if arr.dtype == np.uint16:
             maxv = int(arr.max()) if arr.size else 65535
             maxv = max(1, maxv)
             disp = (arr.astype(np.float32) / maxv)
-        else:
+        elif arr.dtype == np.uint8:
             disp = arr
+        else:
+            a = arr.astype(np.float32, copy=False)
+            try:
+                vmin = float(np.nanpercentile(a, 1))
+                vmax = float(np.nanpercentile(a, 99))
+            except Exception:
+                vmin = float(np.nanmin(a)) if a.size else 0.0
+                vmax = float(np.nanmax(a)) if a.size else 1.0
+            if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax <= vmin:
+                disp = np.clip(a, 0, 255)
+            else:
+                scale = 1.0 / (vmax - vmin)
+                disp = ((a - vmin) * scale).clip(0.0, 1.0)
         # origin='upper' 使数据坐标与常见图像行列一致（y 向下）
         if self._image_artist is None:
             # 明确指定 extent，使数据坐标与像素索引一一对应：x∈[0,w], y∈[0,h] 且 y 向下
@@ -168,10 +185,105 @@ class ImageCanvas(FigureCanvas):
         # 选择完成后保留矩形供查看，可通过外部关闭或右键删除
 
     def _on_button_press(self, event):
-        """右键删除当前矩形选择，不影响已保存的目标数据"""
+        """右键行为：弹出菜单（属性/清除选择）。"""
         try:
-            if event.button == 3 and self._rect_selector is not None:
+            if event.button != 3:
+                return
+            # 弹出右键菜单
+            menu = QMenu(self)
+            act_props = menu.addAction("属性…")
+            if self._rect_selector is not None:
+                act_clear = menu.addAction("清除选择")
+            else:
+                act_clear = None
+            # 将 matplotlib 坐标转换到全局像素坐标
+            # 优先使用 Qt 原始事件以避免 y 轴方向差异与缩放问题
+            gui_ev = getattr(event, 'guiEvent', None)
+            if gui_ev is not None and hasattr(gui_ev, 'globalPos'):
+                global_pos = gui_ev.globalPos()
+            else:
+                # Matplotlib 的 y 通常从画布底部开始，需要翻转到 Qt 的顶部原点
+                qx = int(event.x)
+                qy = int(self.height() - int(event.y))
+                global_pos = self.mapToGlobal(QPoint(qx, qy))
+            chosen = menu.exec_(global_pos)
+            if chosen is None:
+                return
+            if chosen == act_props:
+                self._show_properties_dialog()
+            elif act_clear is not None and chosen == act_clear:
                 self._clear_current_rectangle()
+        except Exception:
+            pass
+
+    def _show_properties_dialog(self):
+        try:
+            # 收集属性
+            img = self._current_image
+            h = int(img.shape[0]) if img is not None else '-'
+            w = int(img.shape[1]) if img is not None else '-'
+            dtype = str(img.dtype) if img is not None and hasattr(img, 'dtype') else '-'
+
+            # 放大倍数/像素尺寸：优先从快照 illumination.stem_magnification
+            mag = None
+            try:
+                if isinstance(self._latest_snapshot, dict):
+                    mag = self._latest_snapshot.get('illumination', {}).get('stem_magnification')
+            except Exception:
+                mag = None
+            # 位置：stage.position
+            stage_pos = None
+            try:
+                if isinstance(self._latest_snapshot, dict):
+                    pos = self._latest_snapshot.get('stage', {}).get('position', {})
+                    stage_pos = (
+                        pos.get('x', '-'), pos.get('y', '-'), pos.get('z', '-'), pos.get('a', '-'), pos.get('b', '-')
+                    )
+            except Exception:
+                stage_pos = None
+
+            # 计算像素尺寸（单位：Angstrom），若有 magnification
+            px_h = px_w = '-'
+            try:
+                if mag and isinstance(mag, (int, float)) and img is not None:
+                    from src.utils import mag2ps
+                    pixel_size = mag2ps(float(mag), (h, w))
+                    px_h = pixel_size.get('height', '-')
+                    px_w = pixel_size.get('width', '-')
+            except Exception:
+                pass
+
+            # 组装属性
+            properties = {
+                "尺寸 (HxW)": f"{h} x {w}",
+                "数据类型": dtype,
+                "放大倍数": mag if mag is not None else '-',
+                "像素尺寸(H, W) [Å]": f"{px_h}, {px_w}",
+                "样品台位置 (x,y,z,a,b)": f"{stage_pos}" if stage_pos else '-',
+            }
+
+            # 弹出表格
+            try:
+                from view.dialogs import ImagePropertiesPopup
+            except Exception:
+                ImagePropertiesPopup = None
+            if ImagePropertiesPopup is None:
+                return
+            dlg = ImagePropertiesPopup(self, title="图像属性", width=420, height=260)
+            dlg.set_properties(properties)
+            # 出现在画布中心附近（避免与 BasePopup.width/height 属性名冲突，使用 sizeHint 获取尺寸）
+            center = self.rect().center()
+            global_center = self.mapToGlobal(center)
+            hint = dlg.sizeHint()
+            dlg.show_at_position(global_center - QPoint(hint.width() // 2, hint.height() // 2))
+        except Exception:
+            pass
+
+    def set_snapshot(self, snapshot: dict):
+        """由外部（ImagePanel/MainWindow）调用，保存最近快照供属性弹窗使用。"""
+        try:
+            if isinstance(snapshot, dict):
+                self._latest_snapshot = snapshot
         except Exception:
             pass
 

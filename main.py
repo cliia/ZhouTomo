@@ -7,6 +7,8 @@ ZhouTomo 图像处理工具 - 主程序入口
 import sys
 import os
 import logging
+import asyncio
+import qasync
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QTimer
 
@@ -109,8 +111,11 @@ def main():
     # 连接初始化完成信号
     splash.initializationComplete.connect(on_initialization_complete)
     
-    # 运行应用程序
-    return app.exec_()
+    # 使用 qasync 集成 Qt 与 asyncio，避免异步任务阻塞 UI
+    loop = qasync.QEventLoop(app)
+    asyncio.set_event_loop(loop)
+    with loop:
+        return loop.run_forever()
 
 
 if __name__ == '__main__':

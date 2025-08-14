@@ -375,7 +375,8 @@ async def main():
             port=config.port,
             reload=config.reload,
             log_level=config.log_level.lower(),
-            access_log=True
+            access_log=True,
+            http="h11"
         )
         
         server = uvicorn.Server(config_dict)

@@ -329,8 +329,8 @@ class ConnectEMPopup(BasePopup):
         
         # URL 输入框（默认本机虚拟电镜）
         self.url_input = QLineEdit()
-        self.url_input.setPlaceholderText("例如：http://127.0.0.1:9000")
-        self.url_input.setText("http://127.0.0.1:9000")
+        self.url_input.setPlaceholderText("例如：http://169.254.225.233:9000")
+        self.url_input.setText("http://169.254.225.233:9000")
         self.url_input.setMinimumWidth(240)
         self.url_input.setFixedHeight(self.LINE_HEIGHT)
         grid_layout.addWidget(self.url_input, 0, 1, Qt.AlignVCenter)
@@ -400,7 +400,7 @@ class ImageCapturePopup(BasePopup):
         grid_layout.addWidget(size_label, row, 0, Qt.AlignRight)
         
         self.size_combo = QComboBox()
-        self.size_combo.addItems(["1 (2048x2048)", "2 (1024x1024)", "4 (512x512)", "8 (256x256)", "16 (128x128)"])
+        self.size_combo.addItems(["0", "1", "2"])  # 与服务端 Enum 对齐
         self.size_combo.setFixedHeight(self.LINE_HEIGHT)
         self.size_combo.setStyleSheet(combo_style_sheet)
         grid_layout.addWidget(self.size_combo, row, 1)
@@ -455,7 +455,7 @@ class ImageCapturePopup(BasePopup):
         grid_layout.addWidget(binning_label, row, 0, Qt.AlignRight)
         
         self.binning_combo = QComboBox()
-        self.binning_combo.addItems(["1 (2048x2048)", "2 (1024x1024)", "4 (512x512)", "8 (256x256)", "16 (128x128)", "32 (64x64)", "64 (16x16)"])
+        self.binning_combo.addItems(["1", "2", "4", "8"])  # 与服务端 Enum 对齐
         self.binning_combo.setFixedHeight(self.LINE_HEIGHT)
         self.binning_combo.setStyleSheet(combo_style_sheet)
         grid_layout.addWidget(self.binning_combo, row, 1)
@@ -572,15 +572,10 @@ class ImageCapturePopup(BasePopup):
             print(f"更新UI失败: {e}")
     
     def get_combo_index_by_value(self, combo, value):
-        """根据值精确匹配首个标记获取下拉菜单索引
-        要求项文本形如 "<number> (<desc>)"，仅比较第一个数字标记，避免子串误匹配。
-        """
+        """根据值精确匹配下拉项文本（文本即数字字符串）。"""
         target = str(value).strip()
         for i in range(combo.count()):
-            item_text = combo.itemText(i)
-            # 取第一个空格前的标记，例如 "4 (512x512)" -> "4"
-            first_token = item_text.split(" ", 1)[0].strip()
-            if first_token == target:
+            if combo.itemText(i).strip() == target:
                 return i
         return -1
     
@@ -918,3 +913,71 @@ class AutoTiltSettingsPopup(BasePopup):
             print(f"读取自动倾转参数失败: {e}")
             return None
 
+
+class ImagePropertiesPopup(BasePopup):
+    """图像属性弹出框：使用表格展示键值信息（只读）。"""
+
+    def __init__(self, parent=None, title="图像属性", width=360, height=220):
+        super().__init__(parent, title, width, height)
+        self._props = {}
+
+    def init_content(self):
+        from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView
+        self.table = QTableWidget(0, 2, self)
+        self.table.setHorizontalHeaderLabels(["属性", "值"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.table.setFocusPolicy(Qt.NoFocus)
+        # 显式样式，避免深色主题下文字不可见
+        self.table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: {colors.LIGHTER_BACKGROUND};
+                color: {colors.TEXT_NORMAL};
+                gridline-color: {colors.BORDER_COLOR};
+                border: 1px solid {colors.BORDER_COLOR};
+                font-family: Microsoft YaHei;
+                font-size: 12px;
+            }}
+            QHeaderView::section {{
+                background-color: {colors.LIGHT_BACKGROUND};
+                color: {colors.TEXT_NORMAL};
+                border: 1px solid {colors.BORDER_COLOR};
+                font-weight: bold;
+                padding: 4px;
+            }}
+        """)
+        self.content_layout.addWidget(self.table)
+
+    def set_properties(self, props: dict):
+        try:
+            from PyQt5.QtWidgets import QTableWidgetItem
+            if not isinstance(props, dict):
+                return
+            self._props = dict(props)
+            items = list(self._props.items())
+            # 预设行数并填充，避免某些平台上 insertRow 表现异常
+            self.table.clearContents()
+            self.table.setRowCount(len(items))
+            # 设回表头
+            self.table.setHorizontalHeaderLabels(["属性", "值"])
+            for row, (key, value) in enumerate(items):
+                ki = QTableWidgetItem(str(key))
+                ki.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                vi = QTableWidgetItem(str(value))
+                vi.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                self.table.setItem(row, 0, ki)
+                self.table.setItem(row, 1, vi)
+            try:
+                self.table.resizeColumnsToContents()
+                self.table.resizeRowsToContents()
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def get_data(self):
+        # 只读展示，无需返回数据
+        return None

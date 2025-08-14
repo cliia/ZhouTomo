@@ -94,15 +94,57 @@ class ImagePanel(QWidget):
     def set_image_array(self, image_array: np.ndarray):
         self.image_canvas.set_image(image_array)
 
-    def set_image_stack(self, frames_b64_list):
-        """显示帧栈：保存 b64 列表，提供滑块/编辑导航。"""
+    def set_image_stack(self, frames_b64_list, frame_shapes=None, frame_dtypes=None, frame_byteorders=None):
+        """显示帧栈：保存 b64 列表，提供滑块/编辑导航。
+        可选携带服务端提供的帧形状/类型信息，优先用于解码，避免靠字节数猜测导致条纹。
+        """
         if not frames_b64_list:
             return
         self._original_frames_data = frames_b64_list
         self._current_frame_index = 0
+        self._frame_shapes = frame_shapes or [None] * len(frames_b64_list)
+        self._frame_dtypes = frame_dtypes or [None] * len(frames_b64_list)
+        self._frame_byteorders = frame_byteorders or [None] * len(frames_b64_list)
 
-        def decode_to_array(b64: str):
+        def _dtype_from_meta(dtype_name: str, byteorder: str):
+            if not dtype_name:
+                return None
+            dn = dtype_name.lower()
+            # 默认小端
+            bo = '<' if byteorder in (None, '=', '<') else '>'
+            mapping = {
+                'uint8': 'u1', 'u1': 'u1',
+                'uint16': 'u2', 'u2': 'u2',
+                'int16': 'i2', 'i2': 'i2',
+                'int32': 'i4', 'i4': 'i4',
+                'float32': 'f4', 'f4': 'f4',
+                'float64': 'f8', 'f8': 'f8',
+            }
+            core = mapping.get(dn)
+            if not core:
+                return None
+            if core in ('u1',):
+                return np.dtype(core)
+            return np.dtype(bo + core)
+
+        def decode_to_array(b64: str, idx: int):
             data = base64.b64decode(b64)
+            # 优先使用服务端元数据
+            shape = self._frame_shapes[idx] if idx < len(self._frame_shapes) else None
+            dtype_name = self._frame_dtypes[idx] if idx < len(self._frame_dtypes) else None
+            byteorder = self._frame_byteorders[idx] if idx < len(self._frame_byteorders) else None
+            try:
+                if shape and isinstance(shape, (list, tuple)) and len(shape) >= 2 and dtype_name:
+                    h, w = int(shape[0]), int(shape[1])
+                    dt = _dtype_from_meta(dtype_name, byteorder)
+                    if dt is None:
+                        raise ValueError("unsupported dtype from meta")
+                    arr = np.frombuffer(data, dtype=dt)
+                    if arr.size >= h * w:
+                        return arr[:h*w].reshape(h, w)
+            except Exception:
+                pass
+            # 回退：按正方 8bit/16bit 猜测
             n_bytes = len(data)
             side8 = int((n_bytes) ** 0.5)
             if side8 * side8 == n_bytes:
@@ -112,8 +154,8 @@ class ImagePanel(QWidget):
                 return np.frombuffer(data, dtype='<u2').reshape(side16, side16)
             return np.full((512, 512), 128, dtype=np.uint8)
 
-        self._decode_frame_fn = decode_to_array
-        first_arr = decode_to_array(frames_b64_list[0])
+        self._decode_frame_fn = lambda b64, i: decode_to_array(b64, i)
+        first_arr = decode_to_array(frames_b64_list[0], 0)
         self.set_image_array(first_arr)
 
         total = len(frames_b64_list)
@@ -127,6 +169,14 @@ class ImagePanel(QWidget):
     def get_current_image_array(self):
         return getattr(self.image_canvas, '_current_image', None)
 
+    def set_snapshot(self, snapshot: dict):
+        """转发快照给画布，供属性对话框使用。"""
+        try:
+            if hasattr(self, 'image_canvas') and self.image_canvas:
+                self.image_canvas.set_snapshot(snapshot)
+        except Exception:
+            pass
+
     # ---------- 内部事件 ----------
     def _on_frame_slider_changed(self, value: int):
         try:
@@ -134,7 +184,7 @@ class ImagePanel(QWidget):
             frames = self._original_frames_data
             if not frames or not (1 <= idx <= len(frames)):
                 return
-            arr = self._decode_frame_fn(frames[idx - 1]) if self._decode_frame_fn else None
+            arr = self._decode_frame_fn(frames[idx - 1], idx - 1) if self._decode_frame_fn else None
             if arr is None:
                 return
             self.image_canvas.set_image(arr)

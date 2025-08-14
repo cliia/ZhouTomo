@@ -266,14 +266,8 @@ class MainToolbar(QWidget):
     def execute_image_capture(self):
         """执行图像采集"""
         self.statusUpdate.emit("正在采集图像...")
+        # 最后的接收对象是 self.agent_manager.start_acquisition()
         self.imageCaptureRequested.emit()
-        
-        # # 如果父窗口存在，调用图像采集方法
-        # if self.parent_window and hasattr(self.parent_window, 'start_image_acquisition'):
-        #     try:
-        #         self.parent_window.start_image_acquisition()
-        #     except Exception as e:
-        #         print(f"调用父窗口图像采集方法时发生错误: {e}")
     
     def execute_select_target(self):
         """执行选择目标"""

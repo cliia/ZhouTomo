@@ -451,6 +451,123 @@ def register_routes(app: FastAPI):
             logger.error(f"Failed to get params: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
+    # 诊断路由：列出可用 STEM 探测器信息
+    @app.get("/diagnostics/acquisition/detectors", tags=["Diagnostics"]) 
+    async def diagnostics_acquisition_detectors():
+        try:
+            wiring = get_microscope_wiring()
+            microscope = wiring.get_microscope()
+            result: Dict[str, Any] = {"detectors": []}
+            try:
+                acq = getattr(microscope, 'instrument', None).Acquisition if microscope else None
+            except Exception:
+                acq = None
+            if not acq:
+                return result
+            try:
+                dets = getattr(acq, 'Detectors', None)
+                if dets:
+                    for det in dets:
+                        info = getattr(det, 'Info', None)
+                        item = {"name": getattr(info, 'Name', None)}
+                        for k in ['Brightness', 'Contrast', 'Binnings']:
+                            try:
+                                item[k] = getattr(info, k)
+                            except Exception:
+                                pass
+                        result["detectors"].append(item)
+            except Exception:
+                pass
+            return result
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Diagnostics acquisition detectors failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # 诊断路由：只读列出 Acquisition 相关属性
+    @app.get("/diagnostics/acquisition/attributes", tags=["Diagnostics"]) 
+    async def diagnostics_acquisition_attributes(deep: int = 1):
+        """列出 instrument.Acquisition 及常见子对象的可用属性（只读，避免重操作）
+
+        Query:
+          - deep: 0 仅列出 Acquisition 顶层属性；>=1 同时尝试列出常见子对象属性
+        """
+        try:
+            wiring = get_microscope_wiring()
+            microscope = wiring.get_microscope()
+
+            result: Dict[str, Any] = {
+                "microscope_type": type(microscope).__name__ if microscope else None,
+                "instrument_present": False,
+                "acquisition_present": False,
+                "acquisition_attrs": [],
+                "acq_params_candidates": {},
+                "detector_info_candidates": {},
+                "notes": [
+                    "该端点仅做浅层属性枚举，尽量避免触发硬件操作",
+                    "候选名基于常见差异：StemAcqParams/STEMAcqParams, AcqImageSize/ImageSize 等"
+                ]
+            }
+
+            # 安全地用 dir 列出名称，尽量少用 getattr
+            def list_names(obj: Any) -> List[str]:
+                try:
+                    return [n for n in dir(obj) if not n.startswith('_')]
+                except Exception:
+                    return []
+
+            instrument = getattr(microscope, 'instrument', None) if microscope else None
+            if instrument is None:
+                return result
+            result["instrument_present"] = True
+
+            # Acquisition 顶层
+            acq = None
+            try:
+                if 'Acquisition' in list_names(instrument):
+                    acq = getattr(instrument, 'Acquisition')
+            except Exception:
+                acq = None
+            if acq is None:
+                return result
+            result["acquisition_present"] = True
+            result["acquisition_attrs"] = list_names(acq)
+
+            if deep >= 1:
+                # 常见子对象候选
+                acq_params_names = ['StemAcqParams', 'STEMAcqParams', 'AcqParams', 'STEMScanParams']
+                det_info_names = ['STEMDetectorInfo', 'DetectorInfo', 'StemDetectorInfo']
+                # 枚举子对象是否存在以及其属性名
+                for name in acq_params_names:
+                    present = name in result["acquisition_attrs"]
+                    child_attrs: List[str] = []
+                    if present:
+                        try:
+                            child = getattr(acq, name)
+                            child_attrs = list_names(child)
+                        except Exception:
+                            child_attrs = []
+                    result["acq_params_candidates"][name] = {"present": present, "attrs": child_attrs}
+
+                for name in det_info_names:
+                    present = name in result["acquisition_attrs"]
+                    child_attrs: List[str] = []
+                    if present:
+                        try:
+                            child = getattr(acq, name)
+                            child_attrs = list_names(child)
+                        except Exception:
+                            child_attrs = []
+                    result["detector_info_candidates"][name] = {"present": present, "attrs": child_attrs}
+
+            return result
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Diagnostics acquisition attributes failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
     @app.patch("/components/{component}/params", tags=["Microscope"])
     async def set_component_params(
         component: str,
@@ -578,22 +695,83 @@ def register_routes(app: FastAPI):
 
             # 转 base64 序列化
             import base64
-            frames_b64 = []
-            for f in frames:
-                # 兼容 numpy.ndarray / memoryview / bytes
-                if hasattr(f, 'tobytes') and callable(getattr(f, 'tobytes')):
-                    f = f.tobytes()
-                if isinstance(f, (bytes, bytearray, memoryview)):
-                    frames_b64.append(base64.b64encode(bytes(f)).decode('ascii'))
-                else:
-                    # 非字节数据，转字符串以防崩溃（调试占位）
-                    frames_b64.append(base64.b64encode(str(f).encode('utf-8')).decode('ascii'))
+            def frame_to_bytes(obj) -> bytes:
+                try:
+                    # temscript.AcqImage -> use Array
+                    if hasattr(obj, 'Array'):
+                        obj = getattr(obj, 'Array')
+                    # numpy ndarray or similar
+                    if hasattr(obj, 'tobytes') and callable(getattr(obj, 'tobytes')):
+                        return obj.tobytes()
+                    # buffer protocol
+                    if isinstance(obj, (bytes, bytearray, memoryview)):
+                        return bytes(obj)
+                except Exception:
+                    pass
+                # fallback: encode repr (not ideal, but avoids crash)
+                return str(obj).encode('utf-8')
 
-            return {
+            frames_b64 = []
+            frame_shapes = []  # [[h,w], ...]
+            frame_dtypes = []  # ['uint16', 'uint8', ...]
+            frame_byteorders = []  # ['<', '>', '=', None]
+            for f in frames:
+                try:
+                    # 提取元数据（若可用）
+                    arr_obj = None
+                    h = w = None
+                    dtype_name = None
+                    byteorder = None
+                    try:
+                        if hasattr(f, 'Array'):
+                            arr_obj = getattr(f, 'Array')
+                        # 维度信息
+                        if hasattr(f, 'Height') and hasattr(f, 'Width'):
+                            try:
+                                h = int(getattr(f, 'Height'))
+                                w = int(getattr(f, 'Width'))
+                            except Exception:
+                                h = w = None
+                        elif hasattr(arr_obj, 'shape') and isinstance(arr_obj.shape, tuple) and len(arr_obj.shape) >= 2:
+                            h, w = int(arr_obj.shape[0]), int(arr_obj.shape[1])
+                        # dtype 信息
+                        if hasattr(arr_obj, 'dtype'):
+                            dtype_name = str(arr_obj.dtype.name)
+                            try:
+                                byteorder = arr_obj.dtype.byteorder  # '=', '<', '>'
+                            except Exception:
+                                byteorder = None
+                    except Exception:
+                        pass
+
+                    b = frame_to_bytes(f)
+                    frames_b64.append(base64.b64encode(b).decode('ascii'))
+                    frame_shapes.append([h, w] if h and w else None)
+                    frame_dtypes.append(dtype_name)
+                    frame_byteorders.append(byteorder)
+                except Exception:
+                    # 最终兜底，写入占位
+                    frames_b64.append(base64.b64encode(b"placeholder").decode('ascii'))
+                    frame_shapes.append(None)
+                    frame_dtypes.append(None)
+                    frame_byteorders.append(None)
+
+            result_payload = {
                 "success": True,
                 "frames": frames_b64,
-                "count": len(frames_b64)
+                "count": len(frames_b64),
+                # 附带可选元数据，前端若存在则优先使用，避免按平方根猜测
+                "frame_shapes": frame_shapes,
+                "frame_dtypes": frame_dtypes,
+                "frame_byteorders": frame_byteorders
             }
+            # 打印一次元数据用于诊断（避免刷屏，仅在有帧时首帧打印）
+            try:
+                if frames_b64:
+                    logger.info(f"[acq] first frame meta: shape={frame_shapes[0]}, dtype={frame_dtypes[0]}, byteorder={frame_byteorders[0]}")
+            except Exception:
+                pass
+            return result_payload
         except HTTPException:
             raise
         except Exception as e:

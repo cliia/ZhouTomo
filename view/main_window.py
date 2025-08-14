@@ -80,9 +80,14 @@ class AsyncWorker(QThread):
         self.operation_args = None
         # 复用同一个事件循环，避免跨事件循环使用同一ClientSession导致错误
         self.loop = asyncio.new_event_loop()
+        # 当前正在执行的任务（便于shutdown时取消）
+        self._current_task = None
+        self._stopping = False
     
     def set_operation(self, operation, *args):
         """设置要执行的操作"""
+        if self._stopping:
+            return
         self.operation = operation
         self.operation_args = args
     
@@ -93,6 +98,8 @@ class AsyncWorker(QThread):
                 self._run_connect()
             elif self.operation == "acquisition":
                 self._run_acquisition()
+            elif self.operation == "get_snapshot":
+                self._run_get_snapshot()
         except Exception as e:
             self.errorOccurred.emit(f"异步操作执行失败: {str(e)}")
     
@@ -104,9 +111,9 @@ class AsyncWorker(QThread):
             
             # 运行异步连接
             conn_type, server_url = self.operation_args
-            result = self.loop.run_until_complete(
-                self.agent_manager.connect_microscope(conn_type, server_url)
-            )
+            coro = self.agent_manager.connect_microscope(conn_type, server_url)
+            self._current_task = self.loop.create_task(coro)
+            result = self.loop.run_until_complete(self._current_task)
             
             if result:
                 self.connectionResult.emit(True, "连接成功")
@@ -116,7 +123,7 @@ class AsyncWorker(QThread):
         except Exception as e:
             self.connectionResult.emit(False, f"连接错误: {str(e)}")
         finally:
-            pass
+            self._current_task = None
     
     def _run_acquisition(self):
         """运行图像采集操作"""
@@ -125,24 +132,9 @@ class AsyncWorker(QThread):
             asyncio.set_event_loop(self.loop)
             
             # 运行异步图像采集
-            result = self.loop.run_until_complete(
-                self.agent_manager.start_acquisition()
-            )
-            
-            # # 添加调试信息，但不修改原始数据
-            # if result and isinstance(result, dict) and result.get('success') and 'frames' in result:
-            #     frames = result['frames']
-                # if frames:
-                #     print(f"第一帧base64长度: {len(frames[0])}")
-                #     print(f"第一帧base64内容: {frames[0][:50]}...")  # 只显示前50个字符
-                    
-                #     # 验证base64解码是否正常
-                #     import base64
-                #     try:
-                #         decoded = base64.b64decode(frames[0])
-                #         print(f"第一帧解码后大小: {len(decoded)} 字节")
-                #     except Exception as e:
-                #         print(f"第一帧base64解码失败: {e}")
+            coro = self.agent_manager.start_acquisition()
+            self._current_task = self.loop.create_task(coro)
+            result = self.loop.run_until_complete(self._current_task)
             
             if result:
                 self.acquisitionResult.emit(True, result)
@@ -152,26 +144,60 @@ class AsyncWorker(QThread):
         except Exception as e:
             self.acquisitionResult.emit(False, f"图像采集错误: {str(e)}")
         finally:
+            self._current_task = None
+
+    def _run_get_snapshot(self):
+        """运行获取快照操作（用于周期性刷新信息面板）"""
+        try:
+            # 复用工作线程事件循环
+            asyncio.set_event_loop(self.loop)
+            # 调用管理器获取快照（内部会通过信号发出 snapshotUpdated）
+            coro = self.agent_manager.get_snapshot()
+            self._current_task = self.loop.create_task(coro)
+            self.loop.run_until_complete(self._current_task)
+        except asyncio.CancelledError:
+            # 关闭过程中取消，不视为错误
             pass
+        except Exception as e:
+            self.errorOccurred.emit(f"获取状态快照失败: {str(e)}")
+        finally:
+            self._current_task = None
     
     def stop(self):
         """停止异步工作线程"""
         try:
+            self._stopping = True
+            # 尽量取消当前任务
+            try:
+                if self.loop and self._current_task and not self._current_task.done():
+                    self.loop.call_soon_threadsafe(self._current_task.cancel)
+            except Exception:
+                pass
+            
             # 停止线程
             self.quit()
+            try:
+                # 尽量等待线程退出，避免与事件循环并发操作
+                self.wait(5000)
+            except Exception:
+                pass
             
             # 清理事件循环
             if hasattr(self, 'loop') and self.loop:
                 try:
-                    # 取消所有待处理的任务
-                    pending = asyncio.all_tasks(self.loop)
-                    for task in pending:
-                        task.cancel()
-                    
-                    # 运行事件循环直到所有任务完成
                     if not self.loop.is_closed():
-                        self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                        self.loop.close()
+                        if not self.loop.is_running():
+                            # 仅在未运行状态下进行协程清理
+                            pending = asyncio.all_tasks(self.loop)
+                            for task in pending:
+                                task.cancel()
+                            if pending:
+                                self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                            # 关闭事件循环
+                            self.loop.close()
+                        else:
+                            # 事件循环仍在运行，跳过关闭以避免报错
+                            pass
                 except Exception as e:
                     print(f"清理AsyncWorker事件循环时出错: {e}")
                 finally:
@@ -218,6 +244,11 @@ class MainWindow(QMainWindow):
         self.toolbar_widget = None
         self.image_display_thread = None
         self.current_image = None
+        self._shutting_down = False
+        # 当前显示目标（None 表示显示的是实时/普通图像栈）
+        self._displaying_target_id = None
+        # 最近一次服务器状态快照（用于在创建 Target 时绑定）
+        self._latest_snapshot = None
         # 目标单选组（确保只选择一个目标）
         self.target_radio_group = QButtonGroup(self)
         self.target_radio_group.setExclusive(True)
@@ -231,6 +262,8 @@ class MainWindow(QMainWindow):
         self.setup_async_worker()
         
         self.init_ui()
+
+        self.init_timer()
     
     def setup_agent_connections(self):
         """设置AgentClient管理器信号连接"""
@@ -293,7 +326,19 @@ class MainWindow(QMainWindow):
                 frames_b64 = []
             if frames_b64:
                 self.status_bar.showMessage(f"收到 {len(frames_b64)} 张图像")
-                self.show_image_stack(frames_b64)
+                # 同步携带可选元数据（若服务器提供）
+                shapes = result.get("frame_shapes") if isinstance(result, dict) else None
+                dtypes = result.get("frame_dtypes") if isinstance(result, dict) else None
+                byteorders = result.get("frame_byteorders") if isinstance(result, dict) else None
+                # 若服务端上报 dtype 为 int32/float 等，提示并仍尝试按元数据解码
+                try:
+                    if dtypes and len(dtypes) > 0 and isinstance(dtypes[0], str):
+                        dt0 = dtypes[0].lower()
+                        if dt0 not in ("uint8", "uint16", "u1", "u2"):
+                            self.status_bar.showMessage(f"注意: 帧dtype={dt0}，将按元数据解码")
+                except Exception:
+                    pass
+                self.show_image_stack(frames_b64, shapes, dtypes, byteorders)
             else:
                 self.status_bar.showMessage("采集成功，但未返回图像数据")
         else:
@@ -323,6 +368,11 @@ class MainWindow(QMainWindow):
     
     def on_snapshot_updated(self, snapshot):
         """处理状态快照更新"""
+        # 保存全局快照
+        try:
+            self._latest_snapshot = snapshot
+        except Exception:
+            pass
         self.update_info_panel(snapshot)
     
     def on_acquisition_progress(self, current_frame: int, total_frames: int):
@@ -350,6 +400,13 @@ class MainWindow(QMainWindow):
         """窗口关闭事件，自动断开与服务器的连接"""
         try:
             print("正在关闭主窗口，断开与服务器的连接...")
+            # 标记关闭并停止刷新定时器，避免关闭过程中新任务进入
+            self._shutting_down = True
+            try:
+                if hasattr(self, '_timer') and self._timer:
+                    self._timer.stop()
+            except Exception:
+                pass
             
             # 检查是否已连接
             if hasattr(self, 'agent_manager') and self.agent_manager.is_connected:
@@ -516,6 +573,34 @@ class MainWindow(QMainWindow):
             s['server_url'] = getattr(self.agent_manager, 'server_url', '未知')
             s['connection_type'] = getattr(self.agent_manager, 'connection_type', '未知')
             self.info_panel.set_snapshot(s)
+        # 同步把快照转发给中部图像面板，以便右键属性对话框读取放大倍数/位置
+        try:
+            # 若当前正在显示某个目标，则不要用全局快照覆盖画布的目标快照
+            if hasattr(self, 'image_panel') and self.image_panel and snapshot and not getattr(self, '_displaying_target_id', None):
+                self.image_panel.set_snapshot(snapshot)
+        except Exception:
+            pass
+    
+    def init_timer(self):
+        """初始化定时器"""
+        self._timer = QTimer(self)
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._on_timer_tick)
+        self._timer.start()
+
+    def _on_timer_tick(self):
+        """每秒轮询一次服务器快照并刷新信息面板"""
+        try:
+            if self._shutting_down:
+                return
+            if not getattr(self.agent_manager, 'is_connected', False):
+                return
+            # 避免与其他长任务（connect/acquisition）竞争，同一时刻只跑一个
+            if hasattr(self, 'async_worker') and self.async_worker and not self.async_worker.isRunning():
+                self.async_worker.set_operation("get_snapshot")
+                self.async_worker.start()
+        except Exception:
+            pass
     
     def init_ui(self):
         """初始化UI"""
@@ -618,6 +703,17 @@ class MainWindow(QMainWindow):
             controller.frame.connect(lambda arr: self.image_panel.set_image_array(arr) if hasattr(self, 'image_panel') and self.image_panel else None)
             controller.progress.connect(lambda step, msg: self.status_bar.showMessage(f"[AF] {step}: {msg}"))
             controller.error.connect(lambda msg: self.status_bar.showMessage(f"自动聚焦错误: {msg}"))
+            # 动态曲线更新
+            try:
+                if hasattr(self, 'info_panel') and self.info_panel and hasattr(self.info_panel, 'append_focus_point'):
+                    controller.focusMetric.connect(self._on_focus_metric)
+                    # 复刻旧版：曲线与样张联动
+                    if hasattr(self.info_panel, 'update_focus_curves'):
+                        controller.focusCurvesUpdated.connect(lambda rx, ry, sx, sy: self.info_panel.update_focus_curves(rx, ry, sx, sy))
+                    if hasattr(self.info_panel, 'set_sample_roi'):
+                        controller.sampleROI.connect(self.info_panel.set_sample_roi)
+            except Exception:
+                pass
             # 清晰度曲线：启动前重置；过程中追加点；结束时可保留
             try:
                 if hasattr(self, 'info_panel') and self.info_panel:
@@ -729,13 +825,27 @@ class MainWindow(QMainWindow):
             from PyQt5.QtGui import QImage, QPixmap
             import numpy as np
             arr = np.ascontiguousarray(cropped_arr)
-            # 若为 uint16，线性映射到 8bit 便于预览，避免显示过暗
+            # 统一进行到 8bit 的线性归一化，避免 int32/float 直接截断导致全白/全黑
             if arr.dtype == np.uint16:
                 maxv = int(arr.max()) if arr.size else 65535
                 maxv = max(1, maxv)
                 arr8 = (arr.astype(np.float32) * (255.0 / maxv)).clip(0, 255).astype(np.uint8)
+            elif arr.dtype == np.uint8:
+                arr8 = arr
             else:
-                arr8 = arr if arr.dtype == np.uint8 else np.clip(arr, 0, 255).astype(np.uint8)
+                arr_f = arr.astype(np.float32)
+                try:
+                    # 使用分位数抑制极端值，提升可视效果
+                    vmin = float(np.percentile(arr_f, 1))
+                    vmax = float(np.percentile(arr_f, 99))
+                except Exception:
+                    vmin = float(arr_f.min()) if arr_f.size else 0.0
+                    vmax = float(arr_f.max()) if arr_f.size else 1.0
+                if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax <= vmin:
+                    arr8 = np.clip(arr_f, 0, 255).astype(np.uint8)
+                else:
+                    scale = 255.0 / (vmax - vmin)
+                    arr8 = ((arr_f - vmin) * scale).clip(0, 255).astype(np.uint8)
 
             if arr8.ndim == 2:
                 h, w = arr8.shape
@@ -759,7 +869,8 @@ class MainWindow(QMainWindow):
 
             # 存入数据模型（保存原图 id、矩形等）
             rect = (x_min, y_min, x_max - x_min, y_max - y_min)
-            self._save_target_to_model(pix, rect)
+            # 在保存时传入完整帧，便于写入 TargetModel.global_images 与绑定快照
+            self._save_target_to_model(pix, rect, full_image=img)
             self._target_counter = getattr(self, '_target_counter', 0) + 1
             self.status_bar.showMessage("框选完成")
             # 完成一次框选后自动退出框选模式，防止连续误画
@@ -793,7 +904,7 @@ class MainWindow(QMainWindow):
             }
         return self._data_model
 
-    def _save_target_to_model(self, pixmap: QPixmap, rect=None):
+    def _save_target_to_model(self, pixmap: QPixmap, rect=None, full_image=None):
         model = self._ensure_data_model()
         from uuid import uuid4
         target_id = str(uuid4())
@@ -806,7 +917,27 @@ class MainWindow(QMainWindow):
         # 同步创建 TargetModel
         try:
             display_name = f"目标 {getattr(self, '_target_counter', 0) + 1}"
-            model['target_models'][target_id] = TargetModel(target_id=target_id, name=display_name, preview_pixmap=pixmap, rect=rect)
+            tm = TargetModel(target_id=target_id, name=display_name, preview_pixmap=pixmap, rect=rect)
+            # 绑定创建时的快照
+            try:
+                if isinstance(getattr(self, '_latest_snapshot', None), dict):
+                    tm.snapshot = dict(self._latest_snapshot)
+            except Exception:
+                pass
+            # 同步写入 GlobalImage
+            try:
+                if full_image is not None:
+                    mag = None
+                    try:
+                        if isinstance(tm.snapshot, dict):
+                            mag = tm.snapshot.get('illumination', {}).get('stem_magnification')
+                    except Exception:
+                        mag = None
+                    mag_val = float(mag) if isinstance(mag, (int, float)) else 0.0
+                    tm.add_global(full_image, magnification=mag_val)
+            except Exception:
+                pass
+            model['target_models'][target_id] = tm
         except Exception:
             pass
         # 使用自定义小部件，左上角带单选框
@@ -999,6 +1130,11 @@ class MainWindow(QMainWindow):
         self.file_panel = FilePanel()
         self.file_panel.set_button_group(self.target_radio_group)
         splitter.addWidget(self.file_panel)
+        # 双击目标 -> 显示其 GlobalImage
+        try:
+            self.file_panel.list.itemDoubleClicked.connect(self._on_file_item_double_clicked)
+        except Exception:
+            pass
         
         # 中：图像面板
         self.image_panel = ImagePanel()
@@ -1143,17 +1279,50 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.show_error_message(f"启动图像采集时发生错误: {str(e)}")
 
-    def show_image_stack(self, frames_b64_list):
+    def show_image_stack(self, frames_b64_list, frame_shapes=None, frame_dtypes=None, frame_byteorders=None):
         """将帧栈交由 ImagePanel 处理并刷新右侧分析。"""
         try:
+            # 回到普通图像显示模式
+            self._displaying_target_id = None
             if not hasattr(self, 'image_panel') or not self.image_panel:
                 return
-            self.image_panel.set_image_stack(frames_b64_list)
+            self.image_panel.set_image_stack(frames_b64_list, frame_shapes, frame_dtypes, frame_byteorders)
             first = self.image_panel.get_current_image_array()
             if first is not None:
                 self.update_analysis_panels(first)
         except Exception as e:
             self.status_bar.showMessage(f"图像堆栈显示错误: {str(e)}")
+
+    def _on_file_item_double_clicked(self, item):
+        """双击左侧目标 -> 显示该目标的最新 GlobalImage，并设置画布快照为目标快照。"""
+        try:
+            if item is None:
+                return
+            target_id = item.data(Qt.UserRole)
+            if not target_id:
+                return
+            dm = self._ensure_data_model()
+            tm = dm.get('target_models', {}).get(target_id)
+            if tm is None:
+                self.status_bar.showMessage("未找到目标数据")
+                return
+            if not getattr(tm, 'global_images', None):
+                self.status_bar.showMessage("该目标尚无 GlobalImage")
+                return
+            gi = tm.global_images[-1]
+            arr = getattr(gi, 'image', None)
+            if arr is None:
+                self.status_bar.showMessage("GlobalImage 无图像数据")
+                return
+            self._displaying_target_id = target_id
+            if hasattr(self, 'image_panel') and self.image_panel:
+                self.image_panel.set_image_array(arr)
+                if isinstance(getattr(tm, 'snapshot', None), dict):
+                    self.image_panel.set_snapshot(tm.snapshot)
+            self.update_analysis_panels(arr)
+            self.status_bar.showMessage(f"显示 {getattr(tm, 'name', '目标')} 的 GlobalImage")
+        except Exception as e:
+            self.status_bar.showMessage(f"显示目标图像失败: {e}")
 
     def _on_frame_slider_changed(self, value: int):
         try:

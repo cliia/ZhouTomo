@@ -44,39 +44,46 @@ def get_definition(i_raw: np.ndarray, **kwargs) -> Tuple[Union[Union[float, int]
     else:
         eval_method = "VGR"
 
+    # 统一为连续的 float32，避免 OpenCV 对 int32 等类型的不支持导致报错
+    img = np.asarray(i_raw)
+    if img.ndim >= 3 and img.shape[-1] in (3, 4):
+        # 若意外为多通道，转灰度
+        try:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        except Exception:
+            # 退化为取单通道
+            img = img[..., 0]
+    if img.dtype not in (np.float32, np.float64):
+        img = img.astype(np.float32, copy=False)
+    img = np.ascontiguousarray(img)
+
     definition = None
     if eval_method == "Variance":
-        # print("Evaluation method: Variance")
-        definition = float(np.var(i_raw))
+        definition = float(np.var(img))
         result = []
     elif eval_method == "Laplacian":
-        # print("Evaluation method: Laplacian")
-        result = cv2.Laplacian(i_raw, cv2.CV_64F)
+        result = cv2.Laplacian(img, cv2.CV_64F)
         definition = float(np.sum(np.abs(result.flat)))
     elif eval_method == "Tenengrad" or eval_method == "VGR":
-        # print("Evaluation method: Tenengrad-Variance")
-        sobelx = cv2.Sobel(i_raw, cv2.CV_64F, 1, 0, ksize=5)
-        sobely = cv2.Sobel(i_raw, cv2.CV_64F, 0, 1, ksize=5)
-
+        sobelx = cv2.Sobel(img, cv2.CV_64F, 1, 0, ksize=5)
+        sobely = cv2.Sobel(img, cv2.CV_64F, 0, 1, ksize=5)
         tenengrad = np.abs(sobelx) + np.abs(sobely)
         definition = float(np.var(tenengrad))
         result = tenengrad
 
     elif eval_method == "Old-Tenengrad" or eval_method == "TGR":
-        # print("Evaluation method: Tenengrad")
-        sobelx = cv2.Sobel(i_raw, cv2.CV_64F, 1, 0, ksize=5)
-        sobely = cv2.Sobel(i_raw, cv2.CV_64F, 0, 1, ksize=5)
-
+        sobelx = cv2.Sobel(img, cv2.CV_64F, 1, 0, ksize=5)
+        sobely = cv2.Sobel(img, cv2.CV_64F, 0, 1, ksize=5)
         tenengrad = np.abs(sobelx) + np.abs(sobely)
         definition = float(np.sum(tenengrad))
         result = tenengrad
 
     elif eval_method == "GaussianDerivative" or eval_method == "GDR":
-        gdr_result_x = ndimage.gaussian_filter1d(i_raw, sigma=1, order=1, mode='wrap')
-        gdr_result_y = ndimage.gaussian_filter1d(i_raw.T, sigma=1, order=1, mode='wrap')
+        gdr_result_x = ndimage.gaussian_filter1d(img, sigma=1, order=1, mode='wrap')
+        gdr_result_y = ndimage.gaussian_filter1d(img.T, sigma=1, order=1, mode='wrap')
         gdr_result = gdr_result_x ** 2 + gdr_result_y.T ** 2
         result = gdr_result
-        definition = sum(abs(gdr_result).flat)
+        definition = float(np.sum(np.abs(gdr_result)))
 
     else:
         raise ValueError("Illegal EvalMethod" + eval_method)

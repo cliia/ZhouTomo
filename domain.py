@@ -69,12 +69,13 @@ class IlluminationParams:
 @dataclass
 class ProjectionState:
     """投影系统状态"""
-    defocus: float = 0.0          # 离焦量 (um)
+    defocus: float = 0.0          # 离焦量 (m)
 
 
 @dataclass
 class ProjectionParams:
     """投影系统可设置参数"""
+    defocus: float = 0.0          # 离焦量 (m)
     magnification: float = 1000.0 # 放大倍数
     objective_aperture: int = 1   # 物镜光阑索引
     intermediate_aperture: int = 1 # 中间镜光阑索引

@@ -157,11 +157,17 @@ class IlluminationPortTS(BasePort):
             if hasattr(params, 'stem_magnification') and params.stem_magnification > 0:
                 self.instrument.Illumination.StemMagnification = params.stem_magnification
                 logger.info(f"Set stem magnification to {params.stem_magnification}")
+            elif isinstance(params, dict) and 'stem_magnification' in params:
+                self.instrument.Illumination.StemMagnification = float(params['stem_magnification'])
+                logger.info(f"Set stem magnification to {params['stem_magnification']}")
             
-            if hasattr(params, 'stem_rotation') and params.stem_rotation > 0:
+            if hasattr(params, 'stem_rotation'):
                 self.instrument.Illumination.StemRotation = params.stem_rotation
                 logger.info(f"Set stem rotation to {params.stem_rotation}")
-            
+            elif isinstance(params, dict) and 'stem_rotation' in params:
+                self.instrument.Illumination.StemRotation = float(params['stem_rotation'])
+                logger.info(f"Set stem rotation to {params['stem_rotation']}")
+
             return True
         except Exception as e:
             logger.error(f"Failed to set illumination params: {e}")
@@ -198,9 +204,19 @@ class ProjectionPortTS(BasePort):
     def set_params(self, params: ProjectionParams) -> bool:
         """设置投影系统参数"""
         try:
-            if hasattr(params, 'defocus') and params.defocus > 0:
-                self.instrument.Projection.Defocus = params.defocus
-                logger.info(f"Set defocus to {params.defocus}")
+            # 兼容两种入参：
+            # 1) dataclass: ProjectionParams（推荐）
+            # 2) dict: {"defocus": value}
+            defocus_value = None
+            if hasattr(params, 'defocus'):
+                defocus_value = getattr(params, 'defocus')
+            elif isinstance(params, dict) and 'defocus' in params:
+                defocus_value = params.get('defocus')
+
+            if defocus_value is not None:
+                # temscript 单位为米
+                self.instrument.Projection.Defocus = float(defocus_value)
+                logger.info(f"Set defocus to {defocus_value}")
             
             return True
         except Exception as e:
@@ -249,13 +265,21 @@ class StagePortTS(BasePort):
         """设置载物台参数"""
         try:
             # 有 position 参数，则移动到该位置
-            if hasattr(params, 'position') and params.position > 0:
+            if hasattr(params, 'position'):
                 self.instrument.Stage.GoTo(
                     x=params.position.x,
                     y=params.position.y,
                     z=params.position.z,
                     a=params.position.a,
                     b=params.position.b
+                )
+            elif isinstance(params, dict) and 'position' in params:
+                self.instrument.Stage.GoTo(
+                    x=params['position']['x'],
+                    y=params['position']['y'],
+                    z=params['position']['z'],
+                    a=params['position']['a'],
+                    b=params['position']['b']
                 )
             return True
         except Exception as e:
@@ -330,14 +354,45 @@ class AcquisitionPortTS(BasePort):
     
     def get_state(self) -> AcquisitionState:
         """获取采集状态"""
-        return AcquisitionState(
-            acq_image_size=self.instrument.Acquisition.StemAcqParams.AcqImageSize,
-            dwell_time=self.instrument.Acquisition.StemAcqParams.DwellTime,
-            brightness=self.instrument.Acquisition.STEMDetectorInfo.Brightness,
-            contrast=self.instrument.Acquisition.STEMDetectorInfo.Contrast,
-            binnings=self.instrument.Acquisition.STEMDetectorInfo.Binnings,
-            frames=self._frames
-        )
+        try:
+            acq_params = self.instrument.Acquisition.StemAcqParams
+            acq_image_size = acq_params.ImageSize
+            dwell_time = acq_params.DwellTime
+            # Binning 位于 StemAcqParams
+            binnings = getattr(acq_params, 'Binning', self._binnings)
+
+            # 亮度/对比度来自当前 STEM 探测器的 Info
+            brightness_val = self._brightness
+            contrast_val = self._contrast
+            try:
+                dets = getattr(self.instrument.Acquisition, 'Detectors', None)
+                if dets and len(dets) > 0:
+                    info = dets[0].Info
+                    if hasattr(info, 'Brightness'):
+                        brightness_val = info.Brightness
+                    if hasattr(info, 'Contrast'):
+                        contrast_val = info.Contrast
+            except Exception as _e:
+                logger.warning(f"Read STEMDetectorInfo failed: {_e}, fallback to cached brightness/contrast")
+
+            return AcquisitionState(
+                acq_image_size=acq_image_size,
+                dwell_time=dwell_time,
+                brightness=brightness_val,
+                contrast=contrast_val,
+                binnings=binnings,
+                frames=self._frames
+            )
+        except Exception as e:
+            logger.error(f"Failed to get acquisition state: {e}")
+            return AcquisitionState(
+                acq_image_size=self._acq_image_size,
+                dwell_time=self._dwell_time,
+                brightness=self._brightness,
+                contrast=self._contrast,
+                binnings=self._binnings,
+                frames=self._frames
+            )
     
     def set_params(self, params: AcquisitionParams) -> bool:
         """设置采集参数"""
@@ -346,44 +401,74 @@ class AcquisitionPortTS(BasePort):
         logger.info(f"参数类型: {type(params)}")
         
         try:
+            acq_params = self.instrument.Acquisition.StemAcqParams
             # 改进参数验证逻辑
             if hasattr(params, 'acq_image_size'):
                 if params.acq_image_size >= 0:  # 允许0值
                     self._acq_image_size = params.acq_image_size
-                    self.instrument.Acquisition.StemAcqParams.AcqImageSize = params.acq_image_size
-                    logger.info(f"Set acq_image_size to {params.acq_image_size}")
+                    try:
+                        acq_params.ImageSize = params.acq_image_size
+                        logger.info(f"Set ImageSize to {params.acq_image_size}")
+                    except Exception as e:
+                        logger.warning(f"Set ImageSize failed: {e}")
                 else:
                     logger.warning(f"Invalid acq_image_size: {params.acq_image_size}, keeping current value: {self._acq_image_size}")
             
             if hasattr(params, 'dwell_time'):
                 if params.dwell_time > 0:
                     self._dwell_time = params.dwell_time
-                    self.instrument.Acquisition.StemAcqParams.DwellTime = params.dwell_time
-                    logger.info(f"Set dwell_time to {params.dwell_time}")
+                    try:
+                        acq_params.DwellTime = params.dwell_time
+                        logger.info(f"Set DwellTime to {params.dwell_time}")
+                    except Exception as e:
+                        logger.warning(f"Set DwellTime failed: {e}")
                 else:
                     logger.warning(f"Invalid dwell_time: {params.dwell_time}, keeping current value: {self._dwell_time}")
             
             if hasattr(params, 'brightness'):
                 if params.brightness >= 0:  # 允许0值
                     self._brightness = params.brightness
-                    self.instrument.Acquisition.STEMDetectorInfo.Brightness = params.brightness
-                    logger.info(f"Set brightness to {params.brightness}")
+                    set_ok = False
+                    try:
+                        dets = getattr(self.instrument.Acquisition, 'Detectors', None)
+                        if dets and len(dets) > 0:
+                            for det in dets:
+                                info = getattr(det, 'Info', None)
+                                if info is not None and hasattr(info, 'Brightness'):
+                                    info.Brightness = params.brightness
+                                    set_ok = True
+                    except Exception as e:
+                        logger.warning(f"Set DetectorInfo.Brightness failed: {e}")
+                    logger.info(f"Set brightness to {params.brightness} (hardware_set={set_ok})")
                 else:
                     logger.warning(f"Invalid brightness: {params.brightness}, keeping current value: {self._brightness}")
             
             if hasattr(params, 'contrast'):
                 if params.contrast >= 0:  # 允许0值
                     self._contrast = params.contrast
-                    self.instrument.Acquisition.STEMDetectorInfo.Contrast = params.contrast
-                    logger.info(f"Set contrast to {params.contrast}")
+                    set_ok = False
+                    try:
+                        dets = getattr(self.instrument.Acquisition, 'Detectors', None)
+                        if dets and len(dets) > 0:
+                            for det in dets:
+                                info = getattr(det, 'Info', None)
+                                if info is not None and hasattr(info, 'Contrast'):
+                                    info.Contrast = params.contrast
+                                    set_ok = True
+                    except Exception as e:
+                        logger.warning(f"Set DetectorInfo.Contrast failed: {e}")
+                    logger.info(f"Set contrast to {params.contrast} (hardware_set={set_ok})")
                 else:
                     logger.warning(f"Invalid contrast: {params.contrast}, keeping current value: {self._contrast}")
             
             if hasattr(params, 'binnings'):
                 if params.binnings > 0:
                     self._binnings = params.binnings
-                    self.instrument.Acquisition.STEMDetectorInfo.Binnings = params.binnings
-                    logger.info(f"Set binnings to {params.binnings}")
+                    try:
+                        setattr(acq_params, 'Binning', params.binnings)
+                        logger.info(f"Set Binning to {params.binnings}")
+                    except Exception as e:
+                        logger.warning(f"Set Binning failed: {e}")
                 else:
                     logger.warning(f"Invalid binnings: {params.binnings}, keeping current value: {self._binnings}")
             
@@ -414,11 +499,45 @@ class AcquisitionPortTS(BasePort):
             self._is_running = True
             self._acquired_frames = []
             logger.info("Started acquisition")
-            self.instrument.Acquisition.RemoveAllAcqDevices()
-            self.instrument.Acquisition.AddAcqDeviceByName('HAADF')
+            acq = self.instrument.Acquisition
+            # 清空活跃设备并选择一个实际存在的 STEM 探测器
+            try:
+                acq.RemoveAllAcqDevices()
+            except Exception:
+                pass
+
+            chosen = None
+            try:
+                dets = getattr(acq, 'Detectors', None)
+                if dets and len(dets) > 0:
+                    # 名称优先级：HAADF -> ADF -> BF -> 其他第一个
+                    pref = ['HAADF', 'ADF', 'BF']
+                    name_to_det = {}
+                    for det in dets:
+                        info = getattr(det, 'Info', None)
+                        det_name = getattr(info, 'Name', None) if info is not None else None
+                        if det_name:
+                            name_to_det[det_name.upper()] = det
+                    for p in pref:
+                        if p in name_to_det:
+                            chosen = name_to_det[p]
+                            break
+                    if chosen is None:
+                        chosen = dets[0]
+                    # 直接添加对象比按名称更稳妥
+                    acq.AddAcqDevice(chosen)
+                else:
+                    logger.warning("No STEM detectors available in Acquisition.Detectors")
+            except Exception as e:
+                logger.warning(f"Choosing/adding STEM detector failed: {e}")
 
             for _ in range(self._frames):
-                self._acquired_frames.append(self.instrument.Acquisition.AcquireImages()[0].Array.tobytes())
+                imgs = acq.AcquireImages()
+                if imgs and len(imgs) > 0:
+                    # 保留 AcqImage 对象，方便上层提取 Height/Width/dtype/Array
+                    self._acquired_frames.append(imgs[0])
+                else:
+                    logger.warning("AcquireImages returned empty list")
             
             self._is_running = False
             return self._acquired_frames
@@ -579,7 +698,9 @@ class TemscriptMicroscope:
         logger.info(f"组件: {component}")
         logger.info(f"参数: {params}")
         logger.info(f"参数类型: {type(params)}")
-        logger.info(f"可用组件: {list(self._components.keys())}")
+        # 显示可用组件（来源于本地映射）
+        # 注意：TemscriptMicroscope 无 _components 属性
+        # 这里使用 component_map 的键集合
         
         component_map = {
             'gun': self.gun,
@@ -594,7 +715,7 @@ class TemscriptMicroscope:
             'auto_normalize': self.auto_normalize
         }
         
-        logger.info(f"组件映射: {component_map}")
+        logger.info(f"可用组件: {list(component_map.keys())}")
         
         if component not in component_map:
             logger.error(f"未知组件: {component}")
@@ -1038,8 +1159,8 @@ class NullAcquisitionPort(NullPort):
         self._acquired_frames = []
         self._acq_image_size = 1
         self._dwell_time = 2
-        self._brightness = 45.0
-        self._contrast = 45.0
+        self._brightness = 0.45  # brightness 为 0-1 小数，0.45 即代表45%
+        self._contrast = 0.45  # contrast 为 0-1 小数，0.45 即代表45%
         self._binnings = 4
         self._frames = 1
         super().__init__()

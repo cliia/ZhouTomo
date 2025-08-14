@@ -18,7 +18,7 @@ async def basic_usage_example():
     print("=== 基本使用示例 ===")
     
     # 创建客户端实例
-    client = AgentClient("http://localhost:9000")
+    client = AgentClient("http://169.254.225.233:9000")
     
     try:
         # 连接服务器
@@ -58,7 +58,7 @@ async def microscope_control_example():
     """显微镜控制示例"""
     print("\n=== 显微镜控制示例 ===")
     
-    async with AgentClient("http://localhost:9000") as client:
+    async with AgentClient("http://169.254.225.233:9000") as client:
         try:
             # 获取显微镜状态快照
             snapshot = await client.get_snapshot()
@@ -68,13 +68,12 @@ async def microscope_control_example():
             components = await client.get_components()
             print(f"✓ 可用组件: {components['components']}")
             
-            # 获取相机状态
-            camera_state = await client.get_component_state("camera")
-            print(f"✓ 相机状态: {camera_state}")
-            
             # 获取参数配置
             params = await client.get_params()
             print(f"✓ 参数配置: {params}")
+
+            result = await client._make_request("GET", f"/components/projection/state")
+            print('>>> Illumination result: ', result)
             
         except AgentClientError as e:
             print(f"✗ 控制错误: {e}")
@@ -84,29 +83,15 @@ async def parameter_setting_example():
     """参数设置示例"""
     print("\n=== 参数设置示例 ===")
     
-    async with AgentClient("http://localhost:9000") as client:
+    async with AgentClient("http://169.254.225.233:9000") as client:
         # 设置相机参数
         try:
-            camera_params = {
-                "exposure_time": 100.0,
-                "gain": 1.5
-            }
-            result = await client.set_component_params("camera", camera_params)
-            print(f"✓ 相机参数设置结果: {result}")
+            body = {"params": {'defocus': 50e-9}}
+            result = await client._make_request("PATCH", "/components/projection/params", body)
+            print(f"✓ projection defocus 参数设置结果: {result}")
         except AgentClientError as e:
-            print(f"✗ 相机参数设置错误: {e}")
+            print(f"✗ projection defocus 参数设置错误: {e}")
             return
-        
-        # 执行相机命令
-        try:
-            command_result = await client.execute_command(
-                "camera", 
-                "capture", 
-                {"format": "jpeg", "quality": 90}
-            )
-            print(f"✓ 相机命令执行结果: {command_result}")
-        except AgentClientError as e:
-            print(f"✗ 相机命令执行错误: {e}")
 
 
 async def acquisition_control_example():
@@ -224,19 +209,23 @@ async def main():
     print("ZhouTomo AgentClient 使用示例")
     print("=" * 50)
     
-    # 运行所有示例
-    examples = [
-        basic_usage_example,
-        microscope_control_example,
-        parameter_setting_example,
-        acquisition_control_example,
-        websocket_streaming_example,
-        error_handling_example,
-        performance_test_example
-    ]
+    # # 运行所有示例
+    # examples = [
+    #     basic_usage_example,
+    #     microscope_control_example,
+    #     parameter_setting_example,
+    #     acquisition_control_example,
+    #     websocket_streaming_example,
+    #     error_handling_example,
+    #     performance_test_example
+    # ]
+
+    # 统一以“协程函数”形式收集，循环中再调用获得协程对象
+    examples = [microscope_control_example, parameter_setting_example]
     
     for example in examples:
         try:
+            # 调用协程函数以获得协程对象，再 await
             await example()
             print()  # 空行分隔
         except Exception as e:

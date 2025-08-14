@@ -45,6 +45,8 @@ class TargetModel:
     preview_pixmap: Optional[object] = None  # QPixmap（可选）
     rect: Optional[tuple] = None             # (x, y, w, h) in data coords
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
+    # 采集时的状态快照（绑定到该目标，供属性/计算使用）
+    snapshot: Optional[dict] = None
 
     # 数据堆
     reference_images: List[ReferenceImage] = field(default_factory=list)
