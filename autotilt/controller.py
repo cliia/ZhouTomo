@@ -78,6 +78,12 @@ class AutoTiltController(QObject):
             await self._capture_and_store(alpha_deg=self._get_current_alpha_deg_fallback(), use_hr=True, hr_mag_override=self.cfg.hr_magnification)
 
             # 5) 依序倾转 alpha
+            # 在开始前将角度计划下发给信息面板
+            try:
+                if hasattr(self.parent(), 'info_panel') and self.parent().info_panel:
+                    self.parent().info_panel.set_autotilt_plan(list(self.cfg.sequence))
+            except Exception:
+                pass
             step_idx = 0
             for alpha_deg in self.cfg.sequence:
                 step_idx += 1
@@ -107,6 +113,11 @@ class AutoTiltController(QObject):
                 try:
                     if hasattr(self.parent(), 'info_panel') and self.parent().info_panel:
                         self.parent().info_panel.set_autotilt_status("Done")
+                        # 标记该角度已完成并推进进度
+                        try:
+                            self.parent().info_panel.mark_autotilt_angle_done(float(alpha_deg))
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 

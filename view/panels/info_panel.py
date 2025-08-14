@@ -7,6 +7,7 @@
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+from PyQt5.QtGui import QColor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -132,9 +133,64 @@ class InfoPanel(QWidget):
         row2.addWidget(lbl_status_title)
         row2.addWidget(self.at_status_label)
         row2.addStretch()
+        # 进度条
+        self.at_progress = QProgressBar()
+        self.at_progress.setRange(0, 100)
+        self.at_progress.setValue(0)
+        self.at_progress.setTextVisible(True)
+        self.at_progress.setFormat("0% (0/0)")
+        self.at_progress.setStyleSheet(f"""
+            QProgressBar {{
+                background-color: {colors.DARK_BACKGROUND};
+                border: 1px solid {colors.BORDER_COLOR};
+                color: {colors.TEXT_NORMAL};
+                font-family: Microsoft YaHei;
+                font-size: 12px;
+                border-radius: 4px;
+                text-align: center;
+            }}
+            QProgressBar::chunk {{
+                background-color: {colors.BUTTON_HOVER};
+            }}
+        """)
+        # 角度列表表格
+        self.at_table = QTableWidget(0, 3)
+        self.at_table.setHorizontalHeaderLabels(["#", "Alpha (°)", "状态"])
+        self.at_table.verticalHeader().setVisible(False)
+        self.at_table.horizontalHeader().setStretchLastSection(True)
+        self.at_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.at_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.at_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.at_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.at_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.at_table.setFocusPolicy(Qt.NoFocus)
+        self.at_table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: {colors.DARK_BACKGROUND};
+                color: {colors.TEXT_NORMAL};
+                gridline-color: {colors.BORDER_COLOR};
+                border: 1px dashed #555;
+                font-family: Microsoft YaHei;
+                font-size: 12px;
+            }}
+            QHeaderView::section {{
+                background-color: {colors.LIGHT_BACKGROUND};
+                color: {colors.TEXT_NORMAL};
+                border: 1px solid {colors.BORDER_COLOR};
+                font-weight: bold;
+                padding: 4px;
+            }}
+        """)
+        # 内部状态
+        self._at_plan = []  # List[float]
+        self._at_row_map = {}  # alpha_key(str) -> row index
+        self._at_completed = 0
+        self._at_total = 0
+        # 组装布局
         at_layout.addLayout(row1)
         at_layout.addLayout(row2)
-        at_layout.addStretch()
+        at_layout.addWidget(self.at_progress)
+        at_layout.addWidget(self.at_table, 1)
 
         self.automation_tabs.addTab(af_tab, "Auto Focus")
         self.automation_tabs.addTab(at_tab, "Auto Tilt")
@@ -331,6 +387,14 @@ class InfoPanel(QWidget):
         try:
             if hasattr(self, 'at_alpha_label'):
                 self.at_alpha_label.setText(f"{float(alpha_deg):.2f}")
+            # 高亮当前行
+            try:
+                row = self._row_for_alpha(alpha_deg)
+                if row is not None:
+                    self._set_status_row(row, "进行中", QColor(255, 200, 120))
+                    self.at_table.selectRow(row)
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -338,6 +402,97 @@ class InfoPanel(QWidget):
         try:
             if hasattr(self, 'at_status_label'):
                 self.at_status_label.setText(str(status_text))
+        except Exception:
+            pass
+
+    # ---------- Auto Tilt 进度/计划 API ----------
+    def set_autotilt_plan(self, sequence):
+        """设置将要采集的角度序列，并初始化表格与进度。"""
+        try:
+            seq = list(sequence or [])
+            self._at_plan = [float(v) for v in seq]
+            self._at_total = len(self._at_plan)
+            self._at_completed = 0
+            # 清表
+            self.at_table.setRowCount(0)
+            self._at_row_map = {}
+            for idx, a in enumerate(self._at_plan, start=1):
+                row = self.at_table.rowCount()
+                self.at_table.insertRow(row)
+                # 列0: 序号
+                item_idx = QTableWidgetItem(str(idx))
+                item_idx.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                # 列1: Alpha 值
+                item_alpha = QTableWidgetItem(f"{a:.2f}")
+                item_alpha.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                # 列2: 状态
+                item_status = QTableWidgetItem("待采集")
+                item_status.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                self.at_table.setItem(row, 0, item_idx)
+                self.at_table.setItem(row, 1, item_alpha)
+                self.at_table.setItem(row, 2, item_status)
+                self._at_row_map[self._alpha_key(a)] = row
+            # 重置进度
+            self.set_autotilt_progress(0, self._at_total)
+        except Exception:
+            pass
+
+    def set_autotilt_progress(self, completed: int, total: int):
+        """设置进度条完成度。"""
+        try:
+            completed = max(0, int(completed))
+            total = max(0, int(total))
+            self._at_completed = completed
+            self._at_total = total
+            pct = int(round((completed / total) * 100)) if total > 0 else 0
+            self.at_progress.setValue(pct)
+            self.at_progress.setFormat(f"{pct}% ({completed}/{total})")
+        except Exception:
+            pass
+
+    def mark_autotilt_angle_done(self, alpha_deg: float):
+        """将指定角度标记为完成。"""
+        try:
+            row = self._row_for_alpha(alpha_deg)
+            if row is not None:
+                self._set_status_row(row, "✓ 完成", QColor(170, 220, 170))
+                self.set_autotilt_progress(self._at_completed + 1, self._at_total)
+        except Exception:
+            pass
+
+    # ---------- 内部辅助 ----------
+    def _alpha_key(self, alpha: float) -> str:
+        # 以两位小数规整，避免浮点比较误差
+        try:
+            return f"{float(alpha):.2f}"
+        except Exception:
+            return str(alpha)
+
+    def _row_for_alpha(self, alpha: float):
+        try:
+            return self._at_row_map.get(self._alpha_key(alpha))
+        except Exception:
+            return None
+
+    def _set_status_row(self, row: int, text: str, bg_color: QColor = None):
+        try:
+            item = self.at_table.item(row, 2)
+            if item is None:
+                item = QTableWidgetItem("")
+                item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                self.at_table.setItem(row, 2, item)
+            item.setText(text)
+            # 设置整行背景色以突出状态
+            for col in range(self.at_table.columnCount()):
+                ci = self.at_table.item(row, col)
+                if ci is None:
+                    ci = QTableWidgetItem("")
+                    ci.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                    self.at_table.setItem(row, col, ci)
+                if bg_color is not None:
+                    ci.setBackground(bg_color)
+                else:
+                    ci.setBackground(QColor(0,0,0,0))
         except Exception:
             pass
 

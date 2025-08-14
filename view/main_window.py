@@ -672,6 +672,12 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(
                 f"自动倾转参数已保存: 角度数={len(seq)}, HR倍率={hrm if hrm else '未设置'}"
             )
+            # 立即在信息面板展示计划角度列表
+            try:
+                if hasattr(self, 'info_panel') and self.info_panel:
+                    self.info_panel.set_autotilt_plan(list(seq))
+            except Exception:
+                pass
         except Exception as e:
             self.status_bar.showMessage(f"保存自动倾转参数失败: {e}")
 
@@ -801,6 +807,10 @@ class MainWindow(QMainWindow):
                         m = re.search(r"alpha=([\-0-9\.]+)", str(msg))
                         if m:
                             self.info_panel.set_autotilt_alpha(float(m.group(1)))
+                    # 同步更新计划（当用户刚打开时先把计划显示出来）
+                    if hasattr(self, 'info_panel') and self.info_panel and hasattr(at_cfg, 'sequence'):
+                        if not getattr(self.info_panel, '_at_plan', None):
+                            self.info_panel.set_autotilt_plan(list(at_cfg.sequence))
                 except Exception:
                     pass
             controller.progress.disconnect()
