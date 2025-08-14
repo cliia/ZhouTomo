@@ -749,6 +749,13 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.status_bar.showMessage(f"启动自动聚焦失败: {e}")
 
+    def _on_focus_metric(self, defocus_um: float, definition_value: float, step_idx: int):
+        try:
+            if hasattr(self, 'info_panel') and self.info_panel:
+                self.info_panel.append_focus_point(defocus_um, definition_value)
+        except Exception:
+            pass
+
     # 执行自动倾转
     def on_auto_tilt_requested(self):
         try:
