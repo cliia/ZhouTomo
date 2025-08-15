@@ -115,7 +115,8 @@ class MainToolbar(QWidget):
             ('image_capture', '图像采集', self.execute_image_capture, self.settings_image_capture),
             ('select_target', '选择目标', self.execute_select_target, self.settings_select_target),
             ('auto_focus', '自动聚焦', self.execute_auto_focus, self.settings_auto_focus),
-            ('auto_tilt', '自动倾转', self.execute_auto_tilt, self.settings_auto_tilt)
+            ('auto_tilt', '自动倾转', self.execute_auto_tilt, self.settings_auto_tilt),
+            ('pause', '暂停', self.execute_pause, self.settings_pause)
         ]
         
         # 创建按钮和标签
@@ -291,6 +292,15 @@ class MainToolbar(QWidget):
         except Exception:
             print("执行自动倾转操作")
 
+    def execute_pause(self):
+        """执行暂停（取消当前自动化任务）"""
+        self.statusUpdate.emit("正在暂停当前自动化...")
+        try:
+            if hasattr(self.parent_window, 'on_pause_requested'):
+                self.parent_window.on_pause_requested()
+        except Exception:
+            pass
+
     # 新增：选择目标执行与设置（设置同执行，弹出可能由主窗口实现）
     def execute_select_target(self):
         """执行选择目标"""
@@ -303,6 +313,10 @@ class MainToolbar(QWidget):
         # 文字标签点击同样切换按钮选中状态
         if self.select_target_button:
             self.select_target_button.toggle()
+
+    def settings_pause(self):
+        """暂停按钮的设置操作等同于执行动作：立即暂停"""
+        self.execute_pause()
 
     def set_select_target_checked(self, checked: bool):
         """由外部控制“选择目标”按钮按下状态"""
@@ -428,6 +442,13 @@ class MainToolbar(QWidget):
                 self.autofocus_popup.dataSelected.connect(on_selected)
                 # 关闭时释放引用
                 self.autofocus_popup.popupClosed.connect(lambda: setattr(self, 'autofocus_popup', None))
+                # 显示前，用主窗口数据模型里的已有设置预填弹窗
+                try:
+                    dm = self.parent_window._ensure_data_model() if hasattr(self.parent_window, '_ensure_data_model') else None
+                    if dm and 'autofocus_settings' in dm and hasattr(self.autofocus_popup, 'set_from_dict'):
+                        self.autofocus_popup.set_from_dict(dm.get('autofocus_settings') or {})
+                except Exception:
+                    pass
             # 以标签为基准定位弹窗
             label_pos = None
             for lbl in self._text_labels:

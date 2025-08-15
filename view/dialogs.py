@@ -685,7 +685,7 @@ class AutofocusSettingsPopup(BasePopup):
         frs_label.setAlignment(Qt.AlignRight)
         grid.addWidget(frs_label, 1, 0, Qt.AlignRight)
         self.frs_step = QLineEdit()
-        self.frs_step.setText("50.0")
+        self.frs_step.setText("75.0")
         self.frs_step.setFixedHeight(self.LINE_HEIGHT)
         grid.addWidget(self.frs_step, 1, 1)
 
@@ -695,11 +695,24 @@ class AutofocusSettingsPopup(BasePopup):
         iter_label.setAlignment(Qt.AlignRight)
         grid.addWidget(iter_label, 2, 0, Qt.AlignRight)
         self.max_iters = QLineEdit()
-        self.max_iters.setText("20")
+        self.max_iters.setText("10")
         self.max_iters.setFixedHeight(self.LINE_HEIGHT)
         grid.addWidget(self.max_iters, 2, 1)
 
         self.content_layout.addLayout(grid)
+
+    def set_from_dict(self, d: dict):
+        try:
+            if not isinstance(d, dict):
+                return
+            if 'ofrs_step_nm' in d:
+                self.ofrs_step.setText(str(float(d.get('ofrs_step_nm'))))
+            if 'frs_step_nm' in d:
+                self.frs_step.setText(str(float(d.get('frs_step_nm'))))
+            if 'max_iterations' in d:
+                self.max_iters.setText(str(int(d.get('max_iterations'))))
+        except Exception:
+            pass
 
     def get_data(self):
         try:

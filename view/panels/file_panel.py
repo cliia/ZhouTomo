@@ -18,6 +18,7 @@ class FilePanel(QWidget):
     targetDeleted = pyqtSignal(str)
     targetRenamed = pyqtSignal(str, str)
     targetExportTiltSeries = pyqtSignal(str)
+    targetExportTiltSeriesMat = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -88,10 +89,12 @@ class FilePanel(QWidget):
         menu = QMenu(self)
         a_select = QAction("选择", self)
         a_export = QAction("导出倾转序列", self)
+        a_export_mat = QAction("导出倾转序列为 MATLAB (.mat)", self)
         a_rename = QAction("重命名", self)
         a_delete = QAction("删除", self)
         menu.addAction(a_select)
         menu.addAction(a_export)
+        menu.addAction(a_export_mat)
         menu.addSeparator()
         menu.addAction(a_rename)
         menu.addAction(a_delete)
@@ -121,6 +124,7 @@ class FilePanel(QWidget):
 
         a_select.triggered.connect(do_select)
         a_export.triggered.connect(lambda: self.targetExportTiltSeries.emit(item.data(Qt.UserRole)))
+        a_export_mat.triggered.connect(lambda: self.targetExportTiltSeriesMat.emit(item.data(Qt.UserRole)))
         a_rename.triggered.connect(do_rename)
         a_delete.triggered.connect(do_delete)
         menu.exec_(self.list.mapToGlobal(pos))

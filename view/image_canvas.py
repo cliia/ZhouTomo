@@ -67,31 +67,56 @@ class ImageCanvas(FigureCanvas):
             self._figure.subplots_adjust(left=0, right=1, bottom=0, top=1)
             self._axes.set_position([0, 0, 1, 1])
 
-        # 归一化显示：
-        # - uint16: 线性映射到 0-1
-        # - uint8: 直接按 0-255 显示
-        # - 其他整型/浮点: 使用分位数(1%-99%)做鲁棒线性映射，避免全白/全黑
+        # 归一化显示策略（防止过曝）：
+        # - 对 uint8：仅除以 255，保持原始亮度不做对比度拉伸
+        # - 对 uint16：仅除以 65535，保持原始亮度不做对比度拉伸
+        # - 对 float：若值域在 [0,1] 直接裁剪；若在 [0,255] 则除以 255；
+        #            其它未知范围再回退到分位数(1%-99%)拉伸
         arr = image_array
         h, w = arr.shape[0], arr.shape[1]
-        if arr.dtype == np.uint16:
-            maxv = int(arr.max()) if arr.size else 65535
-            maxv = max(1, maxv)
-            disp = (arr.astype(np.float32) / maxv)
-        elif arr.dtype == np.uint8:
-            disp = arr
-        else:
-            a = arr.astype(np.float32, copy=False)
+        a = np.asarray(arr)
+        if a.dtype == np.uint8:
+            disp = (a.astype(np.float32) / 255.0).clip(0.0, 1.0)
+        elif a.dtype == np.uint16:
+            disp = (a.astype(np.float32) / 65535.0).clip(0.0, 1.0)
+        elif np.issubdtype(a.dtype, np.floating):
+            af = a.astype(np.float32, copy=False)
+            # 优先识别常见范围
             try:
-                vmin = float(np.nanpercentile(a, 1))
-                vmax = float(np.nanpercentile(a, 99))
+                vmin = float(np.nanmin(af)) if af.size else 0.0
+                vmax = float(np.nanmax(af)) if af.size else 1.0
             except Exception:
-                vmin = float(np.nanmin(a)) if a.size else 0.0
-                vmax = float(np.nanmax(a)) if a.size else 1.0
-            if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax <= vmin:
-                disp = np.clip(a, 0, 255)
+                vmin, vmax = 0.0, 1.0
+            if np.isfinite(vmin) and np.isfinite(vmax) and vmax > vmin:
+                if vmin >= 0.0 and vmax <= 1.5:
+                    disp = af.clip(0.0, 1.0)
+                elif vmin >= 0.0 and vmax <= 255.0:
+                    disp = (af / 255.0).clip(0.0, 1.0)
+                else:
+                    # 回退到鲁棒分位数拉伸，处理异常范围的浮点图
+                    try:
+                        pvmin = float(np.nanpercentile(af, 1))
+                        pvmax = float(np.nanpercentile(af, 99))
+                    except Exception:
+                        pvmin, pvmax = vmin, vmax
+                    if not np.isfinite(pvmin) or not np.isfinite(pvmax) or pvmax <= pvmin:
+                        disp = ((af - vmin) / (vmax - vmin)).clip(0.0, 1.0)
+                    else:
+                        disp = ((af - pvmin) / max(1e-12, (pvmax - pvmin))).clip(0.0, 1.0)
             else:
-                scale = 1.0 / (vmax - vmin)
-                disp = ((a - vmin) * scale).clip(0.0, 1.0)
+                disp = np.zeros_like(af, dtype=np.float32)
+        else:
+            # 其它整数类型或未知类型：使用最小-最大线性映射，作为兜底
+            af = a.astype(np.float32, copy=False)
+            try:
+                amin = float(np.nanmin(af))
+                amax = float(np.nanmax(af))
+            except Exception:
+                amin, amax = 0.0, 1.0
+            if np.isfinite(amin) and np.isfinite(amax) and amax > amin:
+                disp = ((af - amin) / (amax - amin)).clip(0.0, 1.0)
+            else:
+                disp = np.zeros_like(af, dtype=np.float32)
         # origin='upper' 使数据坐标与常见图像行列一致（y 向下）
         if self._image_artist is None:
             # 明确指定 extent，使数据坐标与像素索引一一对应：x∈[0,w], y∈[0,h] 且 y 向下

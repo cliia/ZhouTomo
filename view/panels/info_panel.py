@@ -121,14 +121,28 @@ class InfoPanel(QWidget):
         at_layout.setSpacing(8)
         row1 = QHBoxLayout();
         lbl_alpha_title = QLabel("当前 Alpha (°)：");
-        lbl_alpha_title.setStyleSheet("QLabel { font-weight: bold; }")
+        lbl_alpha_title.setStyleSheet(f"""
+            QLabel {{
+                font-weight: bold;
+                color: {colors.TEXT_NORMAL};
+                font-family: Microsoft YaHei;
+                font-size: 12px;
+            }}
+        """)
         self.at_alpha_label = QLabel("-")
         row1.addWidget(lbl_alpha_title)
         row1.addWidget(self.at_alpha_label)
         row1.addStretch()
         row2 = QHBoxLayout();
         lbl_status_title = QLabel("对焦状态：");
-        lbl_status_title.setStyleSheet("QLabel { font-weight: bold; }")
+        lbl_status_title.setStyleSheet(f"""
+            QLabel {{
+                font-weight: bold;
+                color: {colors.TEXT_NORMAL};
+                font-family: Microsoft YaHei;
+                font-size: 12px;
+            }}
+        """)
         self.at_status_label = QLabel("-")
         row2.addWidget(lbl_status_title)
         row2.addWidget(self.at_status_label)

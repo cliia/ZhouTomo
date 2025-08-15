@@ -654,6 +654,15 @@ class MainWindow(QMainWindow):
                 return
             dm = self._ensure_data_model()
             dm['autofocus_settings'] = data
+            # 同步一份到 autotilt 的内部使用区域，确保自动倾转调用自动聚焦时拿到最新参数
+            try:
+                at = dm.get('autotilt_settings')
+                if isinstance(at, dict):
+                    at['autofocus_settings'] = dict(data)
+                else:
+                    dm['autotilt_settings'] = {'autofocus_settings': dict(data)}
+            except Exception:
+                pass
             self.status_bar.showMessage(
                 f"自动聚焦参数已保存: OFRS={data['ofrs_step_nm']}nm, FRS={data['frs_step_nm']}nm, iters={data['max_iterations']}"
             )
@@ -786,8 +795,17 @@ class MainWindow(QMainWindow):
                 return
             target_model = target_models[target_id]
             # 2) 读取自动倾转参数 + 自动聚焦参数
-            at_cfg = AutoTiltSettings.from_dict(dm.get('autotilt_settings', {}))
-            af_cfg_dict = dm.get('autofocus_settings', {})
+            at_dict = dm.get('autotilt_settings', {})
+            at_cfg = AutoTiltSettings.from_dict(at_dict)
+            # 优先读取自动倾转里内嵌的自动聚焦参数，其次回退到全局自动聚焦设置
+            af_cfg_dict = {}
+            try:
+                if isinstance(at_dict, dict) and isinstance(at_dict.get('autofocus_settings'), dict):
+                    af_cfg_dict = dict(at_dict.get('autofocus_settings'))
+                else:
+                    af_cfg_dict = dict(dm.get('autofocus_settings', {}))
+            except Exception:
+                af_cfg_dict = dict(dm.get('autofocus_settings', {}))
             # 3) 显微镜 API + 控制器
             if not hasattr(self, 'agent_manager') or not self.agent_manager:
                 self.status_bar.showMessage("未连接显微镜，无法执行自动倾转")
@@ -827,6 +845,26 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.status_bar.showMessage(f"启动自动倾转失败: {e}")
 
+    def on_pause_requested(self):
+        """暂停（取消）当前自动聚焦/自动倾转任务。"""
+        try:
+            cancelled = False
+            if hasattr(self, '_af_controller') and getattr(self, '_af_controller', None):
+                try:
+                    self._af_controller.cancel()
+                    cancelled = True
+                except Exception:
+                    pass
+            if hasattr(self, '_at_controller') and getattr(self, '_at_controller', None):
+                try:
+                    self._at_controller.cancel()
+                    cancelled = True
+                except Exception:
+                    pass
+            self.status_bar.showMessage("已请求暂停当前自动化" if cancelled else "当前无自动化任务在运行")
+        except Exception as e:
+            self.status_bar.showMessage(f"暂停失败: {e}")
+
     def _on_export_tilt_series_requested(self, target_id: str):
         try:
             if not target_id:
@@ -854,6 +892,70 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(f"已保存倾转序列到: {path}")
         except Exception as e:
             self.status_bar.showMessage(f"保存倾转序列失败: {e}")
+
+    def _on_export_tilt_series_mat_requested(self, target_id: str):
+        try:
+            if not target_id:
+                return
+            dm = self._ensure_data_model()
+            tm = dm.get('target_models', {}).get(target_id)
+            if tm is None:
+                self.status_bar.showMessage("未找到目标数据")
+                return
+            import numpy as np
+            # 角度数组
+            alphas = np.array(getattr(tm, 'tilt_alpha_series', []) or [], dtype=np.float32)
+            # 倾转序列（优先导出 HR，其次 Global；均为空则报错）
+            highs_stack = [hi.image for hi in getattr(tm, 'tilt_highres_series', []) if getattr(hi, 'image', None) is not None]
+            globals_stack = [gi.image for gi in getattr(tm, 'tilt_global_series', []) if getattr(gi, 'image', None) is not None]
+            if not len(alphas):
+                self.status_bar.showMessage("该目标暂无倾转数据")
+                return
+            if not highs_stack and not globals_stack:
+                self.status_bar.showMessage("倾转图像为空，无法导出")
+                return
+            from PyQt5.QtWidgets import QFileDialog
+            path, _ = QFileDialog.getSaveFileName(self, "保存倾转序列 (MATLAB)", f"{tm.name}_tilt_series.mat", "MATLAB File (*.mat)")
+            if not path:
+                return
+            # 将图像堆导出为 Python list（MATLAB 中对应 cell 数组），避免 dtype=object 的 numpy 数组
+            def _ensure_numeric_list(img_list):
+                result = []
+                for im in img_list:
+                    try:
+                        arr = np.asarray(im)
+                        if not isinstance(arr, np.ndarray):
+                            continue
+                        # 统一为连续内存、基础数值类型
+                        if arr.dtype in (np.uint8, np.uint16, np.float32, np.float64):
+                            arr2 = np.ascontiguousarray(arr)
+                        else:
+                            # 回退为 float64，避免 MATLAB 读取失败
+                            arr2 = np.ascontiguousarray(arr.astype(np.float64))
+                        result.append(arr2)
+                    except Exception:
+                        continue
+                return result
+
+            data_dict = {
+                'alpha': np.ascontiguousarray(alphas.astype(np.float64)),
+            }
+            hs = _ensure_numeric_list(highs_stack)
+            gs = _ensure_numeric_list(globals_stack)
+            if hs:
+                data_dict['highs'] = hs
+            if gs:
+                data_dict['globals'] = gs
+            # 保存为 .mat
+            try:
+                from scipy.io import savemat
+                savemat(path, data_dict, do_compression=True)
+            except Exception as e:
+                self.status_bar.showMessage(f"保存MAT失败: {e}")
+                return
+            self.status_bar.showMessage(f"已保存倾转序列(MATLAB)到: {path}")
+        except Exception as e:
+            self.status_bar.showMessage(f"保存倾转序列(MATLAB)失败: {e}")
 
     # def open_autofocus_settings(self):
     #     """打开自动聚焦参数设置弹窗，并保存参数到数据模型"""
@@ -1187,6 +1289,17 @@ class MainWindow(QMainWindow):
         self.toolBar.addWidget(self.toolbar_widget)
         self.toolBar.setMovable(False)
         self.addToolBar(Qt.TopToolBarArea, self.toolBar)
+
+        # 可选：给暂停图标按钮设置悬停提示
+        try:
+            for btn in getattr(self.toolbar_widget, '_icon_buttons', []):
+                try:
+                    if hasattr(btn, 'setStatusTip') and btn.toolTip() == '':
+                        btn.setStatusTip('')
+                except Exception:
+                    pass
+        except Exception:
+            pass
     
     def update_status(self, message):
         """更新状态栏消息"""
@@ -1253,6 +1366,8 @@ class MainWindow(QMainWindow):
         # 右键菜单导出倾转序列
         try:
             self.file_panel.targetExportTiltSeries.connect(self._on_export_tilt_series_requested)
+            if hasattr(self.file_panel, 'targetExportTiltSeriesMat'):
+                self.file_panel.targetExportTiltSeriesMat.connect(self._on_export_tilt_series_mat_requested)
         except Exception:
             pass
         

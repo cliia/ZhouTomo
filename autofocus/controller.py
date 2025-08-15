@@ -40,6 +40,9 @@ class AutofocusController(QObject):
         self._defocus_cumulative = 0.0  # ! Unit: m, 累计相对离焦，用作x轴
         self._cached_ref_image = None
 
+        # get definition 方法
+        self.DEFMETHOD = 'VGR'
+
     def cancel(self):
         self._cancel = True
 
@@ -72,15 +75,44 @@ class AutofocusController(QObject):
                 self._logger.info("[AF] cancelled after coarse")
                 return self.finished.emit(False, {"reason": "cancelled"})
 
-            # 细搜（FRS）
-            self.progress.emit(2, "Fine search (FRS)")
-            self._logger.info(f"[AF] fine: step_nm={self.cfg.frs_step_nm}, max_iters={self.cfg.max_iterations}")
-            ok = await self._fine_search()
-            if not ok:
-                self._logger.warning("[AF] fine search failed")
-                return self.finished.emit(False, {"reason": "fine-failed"})
+            # 跳过细搜：直接在粗搜结果中选择 definition 最大的 defocus 并设置
+            self.progress.emit(2, "Select best focus (from OFRS)")
+            try:
+                if len(self.definition_list) > 0 and len(self.defocus_list) == len(self.definition_list):
+                    import numpy as _np
+                    idx_best = int(_np.argmax(_np.asarray(self.definition_list, dtype=float)))
+                    best_defocus = float(self.defocus_list[idx_best])
+                    self._logger.info(f"[AF] best-from-coarse: idx={idx_best}, defocus={best_defocus:.6e} m, def={float(self.definition_list[idx_best]):.3f}")
+                    # 先尝试绝对设置；失败则回退相对设置
+                    set_ok = False
+                    try:
+                        curr = await self.api.get_defocus()
+                    except Exception:
+                        curr = None
+                    try:
+                        set_ok = await self.api.set_defocus(best_defocus)
+                        if set_ok and isinstance(curr, (int, float)):
+                            self._defocus_cumulative += float(best_defocus - float(curr))
+                    except Exception:
+                        set_ok = False
+                    if not set_ok:
+                        try:
+                            curr = await self.api.get_defocus()
+                        except Exception:
+                            curr = None
+                        if isinstance(curr, (int, float)):
+                            delta = float(best_defocus) - float(curr)
+                            ok_rel = await self.api.set_defocus_relative(delta)
+                            if ok_rel:
+                                self._defocus_cumulative += float(delta)
+                                set_ok = True
+                    self._logger.info(f"[AF] set best defocus result: set_ok={set_ok}")
+                else:
+                    self._logger.warning("[AF] no coarse results to choose best focus from")
+            except Exception as e:
+                self._logger.warning(f"[AF] failed to set best-from-coarse defocus: {e}")
             if self._cancel:
-                self._logger.info("[AF] cancelled after fine")
+                self._logger.info("[AF] cancelled after coarse-best-set")
                 return self.finished.emit(False, {"reason": "cancelled"})
 
             # 最终确认
@@ -224,7 +256,7 @@ class AutofocusController(QObject):
             # 清晰度（在当前 defocus 位置测量）
             try:
                 img4def = roi if roi is not None else frame
-                definition, _ = get_definition(img4def, method='VGR')
+                definition, _ = get_definition(img4def, method=self.DEFMETHOD)
             except Exception as ge:
                 self._logger.warning(f"[AF] get_definition failed at coarse iter {it}: {ge}")
                 definition = 0.0
@@ -316,7 +348,7 @@ class AutofocusController(QObject):
             roi = await self._center_by_reference(frame)
             try:
                 img4def = roi if roi is not None else frame
-                definition, _ = get_definition(img4def, method='VGR')
+                definition, _ = get_definition(img4def, method=self.DEFMETHOD)
             except Exception as ge:
                 self._logger.warning(f"[AF] get_definition failed at fine iter {it}: {ge}")
                 definition = 0.0
