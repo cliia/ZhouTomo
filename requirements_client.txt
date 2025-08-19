@@ -18,5 +18,7 @@ websockets>=12.0
 
 # Logging helpers (optional)
 python-json-logger>=2.0.0
-opencv-python>=4.10.0
+opencv-python>=4.12.0
+scipy>=1.15.0
+
 

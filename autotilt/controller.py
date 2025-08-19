@@ -72,10 +72,12 @@ class AutoTiltController(QObject):
             await self._iterative_center_on_target(max_iters=8, pixel_tol=50.0)
 
             # 3) 归中完成后，记录基准 Global / Snapshot / Reference（按目标矩形裁剪）
-            await self._capture_and_store(alpha_deg=self._get_current_alpha_deg_fallback(), use_hr=False)
+            alpha_now = await self._get_current_alpha_deg()
+            await self._capture_and_store(alpha_deg=alpha_now, use_hr=False)
 
             # 4) 放大拍HR作为序列首张（若提供hr倍率，或沿用当前倍率）
-            await self._capture_and_store(alpha_deg=self._get_current_alpha_deg_fallback(), use_hr=True, hr_mag_override=self.cfg.hr_magnification)
+            alpha_now = await self._get_current_alpha_deg()
+            await self._capture_and_store(alpha_deg=alpha_now, use_hr=True, hr_mag_override=self.cfg.hr_magnification)
 
             # 5) 依序倾转 alpha
             # 在开始前将角度计划下发给信息面板
@@ -353,14 +355,22 @@ class AutoTiltController(QObject):
         except Exception:
             pass
 
-    def _get_current_alpha_deg_fallback(self) -> float:
+    async def _get_current_alpha_deg(self) -> float:
+        """读取当前 stage.a（弧度）并转换为度，失败返回 0.0。"""
         try:
-            import math
-            state = None
-            # 无 await：用于初始记录时的兜底；允许返回0
-            return 0.0
+            state = await self.api.get_stage_position()
+            pos = state.get('position', state) if isinstance(state, dict) else {}
+            a_rad = float(pos.get('a', 0.0) or 0.0)
+            return float(a_rad * 180.0 / np.pi)
         except Exception:
-            return 0.0
+            # 回退：尝试从快照读取
+            try:
+                snap = await self.api.get_snapshot()
+                pos = (snap or {}).get('stage', {}).get('position', {}) if isinstance(snap, dict) else {}
+                a_rad = float(pos.get('a', 0.0) or 0.0)
+                return float(a_rad * 180.0 / np.pi)
+            except Exception:
+                return 0.0
 
     async def _run_autofocus_with_nearest_reference(self, alpha_deg: float):
         try:

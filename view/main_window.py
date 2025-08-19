@@ -22,6 +22,7 @@ try:
     from autofocus.config import AutofocusSettings
     from autofocus.microscope_api import MicroscopeAPI
     from autofocus.controller import AutofocusController
+    from autofocus.controller_advanced import AutofocusGoldenSearchController
     from autotilt.controller import AutoTiltController, AutoTiltSettings
 except ImportError:
     # 如果无法导入资源管理器，创建一个简单的替代版本
@@ -712,13 +713,17 @@ class MainWindow(QMainWindow):
 
             # 2) 读取自动聚焦参数
             cfg = AutofocusSettings.from_dict(dm.get('autofocus_settings', {}))
+            algo = (dm.get('autofocus_settings', {}) or {}).get('algorithm', 'basic')
 
             # 3) 显微镜 API + 控制器
             if not hasattr(self, 'agent_manager') or not self.agent_manager:
                 self.status_bar.showMessage("未连接显微镜，无法执行自动聚焦")
                 return
             api = MicroscopeAPI(self.agent_manager)
-            controller = AutofocusController(api, target_model, cfg, parent=self)
+            if str(algo).lower() == 'advanced':
+                controller = AutofocusGoldenSearchController(api, target_model, cfg, parent=self)
+            else:
+                controller = AutofocusController(api, target_model, cfg, parent=self)
             self._af_controller = controller  # 保存引用，便于取消
 
             # 4) 连接信号更新 UI

@@ -8648,3 +8648,27 @@ ports_temscript.TemscriptOperationError: Failed to set stage params: [WinError -
 2025-08-14 15:44:46,950 - ports_temscript - INFO - Port.set_params 结果: True
 2025-08-14 15:44:46,952 - ports_temscript - INFO - === TemscriptMicroscope.set_component_params 完成 ===
 2025-08-14 15:44:46,955 - server_fastapi - INFO - 成功更新 projection 参数
+2025-08-19 20:22:07,447 - __main__ - INFO - Log level set to: INFO
+2025-08-19 20:22:07,566 - __main__ - INFO - Starting agent with config: AgentConfig(mode=local, server_url=None, host=0.0.0.0, port=8000)
+2025-08-19 20:22:07,566 - __main__ - INFO - Initializing agent...
+2025-08-19 20:22:07,566 - wiring - INFO - LocalTemscriptFactory created
+2025-08-19 20:22:07,570 - wiring - ERROR - Failed to create local microscope: [WinError -2147221164] 没有注册类
+2025-08-19 20:22:07,570 - wiring - ERROR - Failed to connect to microscope: Failed to create local microscope: [WinError -2147221164] 没有注册类
+2025-08-19 20:22:07,570 - __main__ - ERROR - Failed to connect to microscope
+2025-08-19 20:22:07,570 - __main__ - ERROR - Failed to connect to microscope
+2025-08-19 20:22:07,570 - __main__ - ERROR - Failed to initialize agent
+2025-08-19 20:22:07,570 - __main__ - INFO - Shutting down agent...
+2025-08-19 20:22:07,571 - __main__ - INFO - Agent shutdown completed
+2025-08-19 20:22:25,393 - __main__ - INFO - Log level set to: INFO
+2025-08-19 20:22:25,495 - __main__ - INFO - Starting agent with config: AgentConfig(mode=null, server_url=None, host=0.0.0.0, port=9000)
+2025-08-19 20:22:25,496 - __main__ - INFO - Initializing agent...
+2025-08-19 20:22:25,496 - wiring - INFO - NullMicroscopeFactory created
+2025-08-19 20:22:25,496 - ports_temscript - INFO - Null microscope simulator initialized
+2025-08-19 20:22:25,496 - wiring - INFO - Null microscope simulator created successfully
+2025-08-19 20:22:25,496 - wiring - INFO - Successfully connected to null microscope
+2025-08-19 20:22:25,496 - __main__ - INFO - Connected to microscope: Unknown
+2025-08-19 20:22:25,497 - __main__ - INFO - Agent initialized successfully
+2025-08-19 20:22:25,501 - server_fastapi - INFO - Microscope wiring set successfully, mode: null
+2025-08-19 20:22:25,502 - __main__ - INFO - Starting server on 0.0.0.0:9000
+2025-08-19 20:22:25,502 - __main__ - INFO - Mode: null
+2025-08-19 20:22:25,552 - server_fastapi - INFO - Starting ZhouTomo API Server...

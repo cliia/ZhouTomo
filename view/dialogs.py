@@ -669,41 +669,56 @@ class AutofocusSettingsPopup(BasePopup):
         grid.setColumnStretch(0, 0)
         grid.setColumnStretch(1, 1)
 
+        # 算法选择
+        algo_label = QLabel("算法：")
+        algo_label.setFixedWidth(120)
+        algo_label.setAlignment(Qt.AlignRight)
+        grid.addWidget(algo_label, 0, 0, Qt.AlignRight)
+        self.algo_combo = QComboBox()
+        self.algo_combo.addItems(["基础（两阶段步进）", "高级（黄金分割）"])  # 返回时映射为 basic/advanced
+        self.algo_combo.setCurrentIndex(1)  # 默认高级
+        self.algo_combo.setFixedHeight(self.LINE_HEIGHT)
+        grid.addWidget(self.algo_combo, 0, 1)
+
         # OFRS 步长 (nm)
         ofrs_label = QLabel("OFRS步长 (nm)：")
         ofrs_label.setFixedWidth(120)
         ofrs_label.setAlignment(Qt.AlignRight)
-        grid.addWidget(ofrs_label, 0, 0, Qt.AlignRight)
+        grid.addWidget(ofrs_label, 1, 0, Qt.AlignRight)
         self.ofrs_step = QLineEdit()
         self.ofrs_step.setText("10.0")
         self.ofrs_step.setFixedHeight(self.LINE_HEIGHT)
-        grid.addWidget(self.ofrs_step, 0, 1)
+        grid.addWidget(self.ofrs_step, 1, 1)
 
         # FRS 步长 (nm)
         frs_label = QLabel("FRS步长 (nm)：")
         frs_label.setFixedWidth(120)
         frs_label.setAlignment(Qt.AlignRight)
-        grid.addWidget(frs_label, 1, 0, Qt.AlignRight)
+        grid.addWidget(frs_label, 2, 0, Qt.AlignRight)
         self.frs_step = QLineEdit()
         self.frs_step.setText("50.0")
         self.frs_step.setFixedHeight(self.LINE_HEIGHT)
-        grid.addWidget(self.frs_step, 1, 1)
+        grid.addWidget(self.frs_step, 2, 1)
 
         # 最大迭代次数
         iter_label = QLabel("最大迭代次数：")
         iter_label.setFixedWidth(120)
         iter_label.setAlignment(Qt.AlignRight)
-        grid.addWidget(iter_label, 2, 0, Qt.AlignRight)
+        grid.addWidget(iter_label, 3, 0, Qt.AlignRight)
         self.max_iters = QLineEdit()
         self.max_iters.setText("20")
         self.max_iters.setFixedHeight(self.LINE_HEIGHT)
-        grid.addWidget(self.max_iters, 2, 1)
+        grid.addWidget(self.max_iters, 3, 1)
 
         self.content_layout.addLayout(grid)
 
     def get_data(self):
         try:
+            # 算法映射
+            algo_text = self.algo_combo.currentText().strip()
+            algo_val = 'advanced' if '高级' in algo_text else 'basic'
             return {
+                "algorithm": algo_val,
                 "ofrs_step_nm": float(self.ofrs_step.text()),
                 "frs_step_nm": float(self.frs_step.text()),
                 "max_iterations": int(self.max_iters.text()),

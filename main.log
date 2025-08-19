@@ -5505,3 +5505,23 @@ client_session: <aiohttp.client.ClientSession object at 0x0000020FDD877BE0>
 2025-08-14 15:47:09,197 - asyncio - ERROR - Unclosed connector
 connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x0000020FDD93EC80>, 123180.343)])']
 connector: <aiohttp.connector.TCPConnector object at 0x0000020FDF98C940>
+2025-08-19 20:22:36,953 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-19 20:22:36,954 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-19 20:22:36,955 - agent_client - WARNING - Request failed, retrying... (1/3)
+2025-08-19 20:22:38,966 - agent_client - WARNING - Request failed, retrying... (2/3)
+2025-08-19 20:22:44,840 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-19 20:22:44,841 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001AFF3712EF0>
+2025-08-19 20:22:44,841 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-19 20:22:44,843 - agent_client - WARNING - Request failed, retrying... (1/3)
+2025-08-19 20:22:46,855 - agent_client - WARNING - Request failed, retrying... (2/3)
+2025-08-19 20:23:08,542 - agent_client - INFO - AgentClient initialized for http://127.0.0.1:9000
+2025-08-19 20:23:08,543 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-19 20:23:08,544 - agent_client - WARNING - Request failed, retrying... (1/3)
+2025-08-19 20:23:10,550 - agent_client - WARNING - Request failed, retrying... (2/3)
+2025-08-19 20:23:22,596 - agent_client - INFO - AgentClient initialized for http://0.0.0.0:9000
+2025-08-19 20:23:22,597 - asyncio - ERROR - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001E39CBF2CE0>
+2025-08-19 20:23:22,597 - agent_client - INFO - HTTP session (re)created for current event loop
+2025-08-19 20:23:22,598 - agent_client - WARNING - Request failed, retrying... (1/3)
+2025-08-19 20:23:24,606 - agent_client - WARNING - Request failed, retrying... (2/3)
