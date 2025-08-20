@@ -41,6 +41,9 @@ class AutoTiltController(QObject):
         self.af_settings_dict = dict(autofocus_settings_dict or {})
         self._cancel = False
         self._logger = logging.getLogger("autotilt.controller")
+        # 固定基础参考（首帧/用户参考），防止逐步漂移
+        self._base_ref_image: Optional[np.ndarray] = None
+        self._base_alpha_deg: float = 0.0
 
     def cancel(self):
         self._cancel = True
@@ -74,6 +77,15 @@ class AutoTiltController(QObject):
             # 3) 归中完成后，记录基准 Global / Snapshot / Reference（按目标矩形裁剪）
             alpha_now = await self._get_current_alpha_deg()
             await self._capture_and_store(alpha_deg=alpha_now, use_hr=False)
+            # 缓存基础参考 ROI 与基础角（用于后续各角度生成稳定模板）
+            try:
+                self._base_ref_image = await self._get_base_reference_roi()
+            except Exception:
+                self._base_ref_image = None
+            try:
+                self._base_alpha_deg = float(self.target.tilt_alpha_series[0]) if getattr(self.target, 'tilt_alpha_series', None) and len(self.target.tilt_alpha_series) > 0 else float(alpha_now)
+            except Exception:
+                self._base_alpha_deg = float(alpha_now)
 
             # 4) 放大拍HR作为序列首张（若提供hr倍率，或沿用当前倍率）
             alpha_now = await self._get_current_alpha_deg()
@@ -336,6 +348,19 @@ class AutoTiltController(QObject):
                 roi, (_, _), (drow, dcol) = extract_pattern(template, frame)
             except Exception:
                 break
+            # 保护：异常大位移（相对帧尺寸）直接忽略一次，避免误匹配导致乱跑
+            try:
+                h, w = int(frame.shape[0]), int(frame.shape[1])
+                if abs(float(drow)) > 0.45 * h or abs(float(dcol)) > 0.45 * w:
+                    try:
+                        self._logger.warning(f"[AT] outlier shift rejected at iter {it}: drow={drow:.1f}, dcol={dcol:.1f}, frame=({h},{w})")
+                    except Exception:
+                        pass
+                    import asyncio as _asyncio
+                    await _asyncio.sleep(0.1)
+                    continue
+            except Exception:
+                pass
             # 估算像素尺寸
             try:
                 mag = await self.api.get_stem_magnification()
@@ -399,6 +424,14 @@ class AutoTiltController(QObject):
                     # 若匹配失败，尝试再次归中一次
                     await self._iterative_center_nearby_alpha(alpha_target_deg=alpha_target_deg, max_iters=4, pixel_tol=pixel_tol)
                     continue
+                # 保护：异常大位移拒绝并复归中
+                try:
+                    h, w = int(frame.shape[0]), int(frame.shape[1])
+                    if abs(float(drow)) > 0.45 * h or abs(float(dcol)) > 0.45 * w:
+                        await self._iterative_center_nearby_alpha(alpha_target_deg=alpha_target_deg, max_iters=6, pixel_tol=pixel_tol)
+                        continue
+                except Exception:
+                    pass
                 drift = float((drow ** 2 + dcol ** 2) ** 0.5)
                 try:
                     self._logger.info(f"[AT] stability drift=\u0394px {drift:.2f} (tol={float(pixel_tol):.2f})")
@@ -586,45 +619,27 @@ class AutoTiltController(QObject):
 
     async def _run_autofocus_with_nearest_reference(self, alpha_deg: float):
         try:
-            # 使用 Reference image 作为自动聚焦对象：选择与当前角度最近邻的参考图
+            # 基于“固定基础参考”生成当前角度模板，防止参考逐步漂移
             scaled_image = None
-            base_ref_img = None
-            # 1) 从倾转序列中找离 alpha_deg 最近的 ReferenceImage
-            try:
-                if getattr(self.target, 'tilt_alpha_series', None) and getattr(self.target, 'tilt_reference_series', None):
-                    alphas = list(self.target.tilt_alpha_series)
-                    refs = list(self.target.tilt_reference_series)
-                    if len(alphas) == len(refs) and len(alphas) > 0:
-                        import numpy as np
-                        arr_a = np.asarray(alphas, dtype=float)
-                        idx = int(np.argmin(np.abs(arr_a - float(alpha_deg))))
-                        base_ref_img = getattr(refs[idx], 'image', None)
-            except Exception:
-                base_ref_img = None
-            # 2) 回退：目标级 Reference 列表（用最近一次）
-            if base_ref_img is None and getattr(self.target, 'reference_images', None):
-                try:
-                    base_ref_img = self.target.reference_images[-1].image if len(self.target.reference_images) > 0 else None
-                except Exception:
-                    base_ref_img = None
-            # 3) 仍无参考：动态建立基础 Reference ROI
+            base_ref_img = self._base_ref_image
             if base_ref_img is None:
                 base_ref_img = await self._get_base_reference_roi()
-            # 将参考按当前角度模拟（中心锚定竖直缩放，基础角取序列首个）
             if base_ref_img is not None:
                 try:
-                    try:
-                        base_alpha = float(self.target.tilt_alpha_series[0]) if getattr(self.target, 'tilt_alpha_series', None) and len(self.target.tilt_alpha_series) > 0 else 0.0
-                    except Exception:
-                        base_alpha = 0.0
-                    scaled_image = self._simulate_vertical_scaling(np.ascontiguousarray(base_ref_img), float(alpha_deg), float(base_alpha))
+                    scaled_image = self._simulate_vertical_scaling(np.ascontiguousarray(base_ref_img), float(alpha_deg), float(self._base_alpha_deg))
                 except Exception:
                     scaled_image = None
-            # 将该参考临时追加到 target.reference_images 末尾，供自动聚焦使用
+            # 预处理模板尺寸，避免过大
+            if scaled_image is not None:
+                try:
+                    scaled_image = self._prepare_template_roi(scaled_image)
+                except Exception:
+                    pass
+            # 用“替换”的方式提供参考，避免不断追加造成参考随时间漂移
             if scaled_image is not None:
                 try:
                     from model.targets import ReferenceImage, StagePose
-                    self.target.reference_images.append(ReferenceImage(image=scaled_image, pose=StagePose()))
+                    self.target.reference_images = [ReferenceImage(image=scaled_image, pose=StagePose())]
                 except Exception:
                     pass
             from autofocus.config import AutofocusSettings

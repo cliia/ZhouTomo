@@ -660,7 +660,7 @@ class AutofocusSettingsPopup(BasePopup):
     """自动聚焦参数设置弹出框（OFRS步长、FRS步长、最大迭代次数）"""
 
     def __init__(self, parent=None):
-        super().__init__(parent, "自动聚焦参数设置", 360, 200)
+        super().__init__(parent, "自动聚焦参数设置", 360, 240)
 
     def init_content(self):
         self.LINE_HEIGHT = 28
@@ -710,6 +710,18 @@ class AutofocusSettingsPopup(BasePopup):
         self.max_iters.setFixedHeight(self.LINE_HEIGHT)
         grid.addWidget(self.max_iters, 3, 1)
 
+        # 阶段4（超精细微扫）开关
+        row_ultra = 4
+        lbl_ultra = QLabel("阶段4：超精细微扫（±10nm）")
+        lbl_ultra.setFixedWidth(120)
+        lbl_ultra.setAlignment(Qt.AlignRight)
+        grid.addWidget(lbl_ultra, row_ultra, 0, Qt.AlignRight)
+        from PyQt5.QtWidgets import QCheckBox
+        self.ultra_enable = QCheckBox("启用")
+        self.ultra_enable.setChecked(True)
+        self.ultra_enable.setStyleSheet(f"color: {colors.TEXT_NORMAL}; font-family: Microsoft YaHei;")
+        grid.addWidget(self.ultra_enable, row_ultra, 1)
+
         self.content_layout.addLayout(grid)
 
     def set_from_dict(self, d: dict):
@@ -722,6 +734,14 @@ class AutofocusSettingsPopup(BasePopup):
                 self.frs_step.setText(str(float(d.get('frs_step_nm'))))
             if 'max_iterations' in d:
                 self.max_iters.setText(str(int(d.get('max_iterations'))))
+            if 'enable_ultra_fine' in d:
+                val = d.get('enable_ultra_fine')
+                try:
+                    if isinstance(val, str):
+                        val = val.strip().lower() in ("1", "true", "yes", "y", "on")
+                    self.ultra_enable.setChecked(bool(val))
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -735,6 +755,7 @@ class AutofocusSettingsPopup(BasePopup):
                 "ofrs_step_nm": float(self.ofrs_step.text()),
                 "frs_step_nm": float(self.frs_step.text()),
                 "max_iterations": int(self.max_iters.text()),
+                "enable_ultra_fine": bool(self.ultra_enable.isChecked()),
             }
         except Exception as e:
             print(f"读取自动聚焦参数失败: {e}")

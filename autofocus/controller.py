@@ -155,6 +155,24 @@ class AutofocusController(QObject):
                 pass
             return None
 
+        # 保护：异常大位移（相对帧大小）直接拒绝，以避免误匹配导致移动方向随机
+        try:
+            h, w = int(frame.shape[0]), int(frame.shape[1])
+            if abs(float(drow)) > 0.45 * h or abs(float(dcol)) > 0.45 * w:
+                try:
+                    self._logger.warning(f"[AF] outlier shift rejected: drow={drow:.1f}, dcol={dcol:.1f}, frame=({h},{w})")
+                except Exception:
+                    pass
+                # 仍向UI发送ROI以便观察，但不移动载台
+                try:
+                    if roi is not None:
+                        self.sampleROI.emit(roi)
+                except Exception:
+                    pass
+                return roi
+        except Exception:
+            pass
+
         # 估算像素尺寸（米/像素）
         try:
             # 优先从目标快照读取放大倍数

@@ -107,21 +107,23 @@ class AutofocusGoldenSearchController(QObject):
             x_refined = await self._parabolic_refine_near(x_opt)
             if isinstance(x_refined, (int, float)):
                 await self._set_defocus_absolute(float(x_refined))
-                await asyncio.sleep(0.2)
                 # 最终确认一次
                 await self._evaluate_at_current()
 
-            # 阶段4：超精细微扫（±10nm）
-            self.progress.emit(4, "Ultra-fine refine (±10 nm)")
+            # 阶段4：超精细微扫（±10nm）（可选）
             try:
-                base_x = float(x_refined) if isinstance(x_refined, (int, float)) else float(x_opt)
+                if bool(getattr(self.cfg, 'enable_ultra_fine', True)):
+                    self.progress.emit(4, "Ultra-fine refine (±10 nm)")
+                    try:
+                        base_x = float(x_refined) if isinstance(x_refined, (int, float)) else float(x_opt)
+                    except Exception:
+                        base_x = float(x_opt)
+                    x_ultra = await self._ultra_fine_refine(base_x)
+                    if isinstance(x_ultra, (int, float)):
+                        await self._set_defocus_absolute(float(x_ultra))
+                        await self._evaluate_at_current()
             except Exception:
-                base_x = float(x_opt)
-            x_ultra = await self._ultra_fine_refine(base_x)
-            if isinstance(x_ultra, (int, float)):
-                await self._set_defocus_absolute(float(x_ultra))
-                await asyncio.sleep(0.2)
-                await self._evaluate_at_current()
+                pass
 
             # 完成
             frame = await self.api.acquire_frame()
