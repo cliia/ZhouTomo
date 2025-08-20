@@ -41,6 +41,7 @@ class ImageCanvas(FigureCanvas):
         self._image_artist = None
         self._rect_selector = None
         self._selection_enabled = False
+        self._overlays = []  # 叠加绘制的matplotlib artists（主体边界等）
         # 右键删除当前选择
         self.mpl_connect('button_press_event', self._on_button_press)
 
@@ -138,6 +139,34 @@ class ImageCanvas(FigureCanvas):
         self._request_draw()
         try:
             self.imageUpdated.emit(image_array)
+        except Exception:
+            pass
+
+    def clear_overlays(self):
+        try:
+            for a in self._overlays:
+                try:
+                    a.remove()
+                except Exception:
+                    pass
+            self._overlays = []
+            self._request_draw()
+        except Exception:
+            pass
+
+    def add_polyline_overlay(self, xy: np.ndarray, color: str = 'lime', linewidth: float = 1.5, closed: bool = False):
+        """添加一条折线叠加，xy 为 Nx2，数据坐标 (x,y)。"""
+        try:
+            import numpy as _np
+            pts = _np.asarray(xy, dtype=float)
+            if pts.ndim != 2 or pts.shape[1] != 2 or pts.size == 0:
+                return
+            if closed:
+                if not (pts[0, 0] == pts[-1, 0] and pts[0, 1] == pts[-1, 1]):
+                    pts = _np.vstack([pts, pts[:1, :]])
+            ln, = self._axes.plot(pts[:, 0], pts[:, 1], color=color, linewidth=linewidth)
+            self._overlays.append(ln)
+            self._request_draw()
         except Exception:
             pass
 

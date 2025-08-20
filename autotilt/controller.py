@@ -9,6 +9,7 @@ from autofocus.microscope_api import MicroscopeAPI
 from model.targets import TargetModel, StagePose
 from src.utils import mag2ps
 from src.normxcorr2 import extract_pattern
+from src.subject_tracker import detect_subject
 import logging
 
 
@@ -44,6 +45,8 @@ class AutoTiltController(QObject):
         # 固定基础参考（首帧/用户参考），防止逐步漂移
         self._base_ref_image: Optional[np.ndarray] = None
         self._base_alpha_deg: float = 0.0
+        # 主体追踪缓存
+        self._subject_mask: Optional[np.ndarray] = None
 
     def cancel(self):
         self._cancel = True
@@ -382,6 +385,32 @@ class AutoTiltController(QObject):
                     await self.api.move_stage_relative(dx=dx_m, dy=dy_m, dz=0.0)
             except Exception:
                 pass
+            # 额外：主体校准到画面中心（以外接矩形中心）
+            try:
+                rect = getattr(self.target, 'rect', None)
+                seed_rect = rect if isinstance(rect, (list, tuple)) and len(rect) == 4 else (0, 0, frame.shape[1], frame.shape[0])
+                mask, contour_xy, (cy, cx) = detect_subject(frame, seed_rect, prev_mask=self._subject_mask)
+                if contour_xy is not None:
+                    try:
+                        parent = self.parent()
+                        if parent is not None and hasattr(parent, 'image_panel') and parent.image_panel:
+                            parent.image_panel.clear_overlays()
+                            parent.image_panel.add_polyline_overlay(contour_xy, color='lime', linewidth=1.5, closed=True)
+                    except Exception:
+                        pass
+                if mask is not None and cy is not None and cx is not None:
+                    self._subject_mask = mask
+                    fh, fw = frame.shape[0], frame.shape[1]
+                    # 将主体中心移动到画面中心
+                    off_y_px = float(cy) - (fh * 0.5)
+                    off_x_px = float(cx) - (fw * 0.5)
+                    # 若偏差明显（>2px）则纠正
+                    if abs(off_x_px) > 2.0 or abs(off_y_px) > 2.0:
+                        dx_c = -off_x_px * ps_w
+                        dy_c = -off_y_px * ps_h
+                        await self.api.move_stage_relative(dx=dx_c, dy=dy_c, dz=0.0)
+            except Exception:
+                pass
             # 小憩
             import asyncio
             await asyncio.sleep(0.2)
@@ -438,6 +467,36 @@ class AutoTiltController(QObject):
                 except Exception:
                     pass
                 if drift <= float(pixel_tol):
+                    # 稳定后做一次主体检查与校正
+                    try:
+                        rect = getattr(self.target, 'rect', None)
+                        seed_rect = rect if isinstance(rect, (list, tuple)) and len(rect) == 4 else (0, 0, frame.shape[1], frame.shape[0])
+                        mask, contour_xy, (cy, cx) = detect_subject(frame, seed_rect, prev_mask=self._subject_mask)
+                        if contour_xy is not None:
+                            try:
+                                parent = self.parent()
+                                if parent is not None and hasattr(parent, 'image_panel') and parent.image_panel:
+                                    parent.image_panel.clear_overlays()
+                                    parent.image_panel.add_polyline_overlay(contour_xy, color='lime', linewidth=1.5, closed=True)
+                            except Exception:
+                                pass
+                        if mask is not None and cy is not None and cx is not None:
+                            self._subject_mask = mask
+                            fh, fw = frame.shape[0], frame.shape[1]
+                            off_y_px = float(cy) - (fh * 0.5)
+                            off_x_px = float(cx) - (fw * 0.5)
+                            if abs(off_x_px) > 2.0 or abs(off_y_px) > 2.0:
+                                mag = await self.api.get_stem_magnification()
+                                if not mag or float(mag) <= 0:
+                                    mag = 5.5e6
+                                ps = mag2ps(float(mag), (frame.shape[0], frame.shape[1]))
+                                ps_h = float(ps['height']) * 1e-10
+                                ps_w = float(ps['width']) * 1e-10
+                                dx_c = -off_x_px * ps_w
+                                dy_c = -off_y_px * ps_h
+                                await self.api.move_stage_relative(dx=dx_c, dy=dy_c, dz=0.0)
+                    except Exception:
+                        pass
                     break
                 # 重新归中一次
                 await self._iterative_center_nearby_alpha(alpha_target_deg=alpha_target_deg, max_iters=6, pixel_tol=pixel_tol)

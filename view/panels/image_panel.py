@@ -94,6 +94,19 @@ class ImagePanel(QWidget):
     def set_image_array(self, image_array: np.ndarray):
         self.image_canvas.set_image(image_array)
 
+    # 叠加绘制 API：供控制器绘制主体边界
+    def clear_overlays(self):
+        try:
+            self.image_canvas.clear_overlays()
+        except Exception:
+            pass
+
+    def add_polyline_overlay(self, xy: np.ndarray, color: str = 'lime', linewidth: float = 1.5, closed: bool = False):
+        try:
+            self.image_canvas.add_polyline_overlay(xy, color=color, linewidth=linewidth, closed=closed)
+        except Exception:
+            pass
+
     def set_image_stack(self, frames_b64_list, frame_shapes=None, frame_dtypes=None, frame_byteorders=None):
         """显示帧栈：保存 b64 列表，提供滑块/编辑导航。
         可选携带服务端提供的帧形状/类型信息，优先用于解码，避免靠字节数猜测导致条纹。
