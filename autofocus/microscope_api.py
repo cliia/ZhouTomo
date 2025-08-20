@@ -159,7 +159,7 @@ class MicroscopeAPI:
 
     async def move_stage_relative(self, dx: float = 0.0, dy: float = 0.0, dz: float = 0.0,
                                   da: float = 0.0, db: float = 0.0) -> bool:
-        """相对移动样品台，单位 um / rad（按你的系统定义）。"""
+        """相对移动样品台，单位 m / rad（按你的系统定义）。"""
         try:
             # 使用临时客户端避免跨事件循环
             if self.server_url and AgentClient is not None:

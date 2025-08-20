@@ -72,10 +72,12 @@ class AutoTiltController(QObject):
             await self._iterative_center_on_target(max_iters=8, pixel_tol=5.0)
 
             # 3) 归中完成后，记录基准 Global / Snapshot / Reference（按目标矩形裁剪）
-            await self._capture_and_store(alpha_deg=self._get_current_alpha_deg_fallback(), use_hr=False)
+            alpha_now = await self._get_current_alpha_deg()
+            await self._capture_and_store(alpha_deg=alpha_now, use_hr=False)
 
             # 4) 放大拍HR作为序列首张（若提供hr倍率，或沿用当前倍率）
-            await self._capture_and_store(alpha_deg=self._get_current_alpha_deg_fallback(), use_hr=True, hr_mag_override=self.cfg.hr_magnification)
+            alpha_now = await self._get_current_alpha_deg()
+            await self._capture_and_store(alpha_deg=alpha_now, use_hr=True, hr_mag_override=self.cfg.hr_magnification)
 
             # 5) 依序倾转 alpha
             # 在开始前将角度计划下发给信息面板
@@ -100,6 +102,8 @@ class AutoTiltController(QObject):
                 await self._move_stage_alpha_deg(alpha_deg)
                 # 最近 alpha 的 Global 用于粗归中
                 await self._iterative_center_nearby_alpha(alpha_target_deg=alpha_deg, max_iters=8, pixel_tol=50.0)
+                # 稳定性检测：等待3秒再采一张，若偏移>10px则重复归中，最多重复3次
+                await self._stability_and_recenter(alpha_deg, max_checks=3, wait_seconds=3.0, pixel_tol=10.0)
                 # 用最近 alpha 的参考 ROI 执行自动聚焦
                 try:
                     if hasattr(self.parent(), 'info_panel') and self.parent().info_panel:
@@ -178,14 +182,15 @@ class AutoTiltController(QObject):
             return None
 
     async def _iterative_center_on_target(self, max_iters: int = 8, pixel_tol: float = 5.0):
-        # 使用“最初”的 GlobalImage（创建目标时记录的第一张），并按目标矩形裁剪为 ROI 作为模板
+        # 使用 GlobalImage 作为初始模板（按目标矩形裁剪），用于倾转找回的基准
         template = self._get_base_global_roi()
         if template is None:
             return
+        template = self._prepare_template_roi(template)
         await self._iterative_center(template, max_iters=max_iters, pixel_tol=pixel_tol)
 
     async def _iterative_center_nearby_alpha(self, alpha_target_deg: float, max_iters: int = 8, pixel_tol: float = 50.0):
-        # 基于“最初”的 GlobalImage 的 ROI，按平面假设在竖直方向进行缩放，模拟当前 alpha 的视图
+        # 基于“最初”的 GlobalImage 的 ROI，做中心锚定竖直缩放以模拟当前 alpha 的视图
         base_template = self._get_base_global_roi()
         if base_template is None:
             return
@@ -195,6 +200,21 @@ class AutoTiltController(QObject):
             base_alpha = 0.0
         scaled = self._simulate_vertical_scaling(base_template, float(alpha_target_deg), float(base_alpha))
         template = scaled if scaled is not None else base_template
+        # 对模板执行一次直方图均衡（可选），提高相关匹配的稳健性
+        try:
+            import numpy as np
+            arr = np.asarray(template)
+            if arr.dtype != np.float32 and arr.dtype != np.float64:
+                arr = arr.astype(np.float32)
+            # 简单对比度拉伸（1%-99%分位）
+            vmin = float(np.percentile(arr, 1))
+            vmax = float(np.percentile(arr, 99))
+            if np.isfinite(vmin) and np.isfinite(vmax) and vmax > vmin:
+                arr = (arr - vmin) * (1.0 / (vmax - vmin))
+                arr = np.clip(arr, 0.0, 1.0)
+            template = self._prepare_template_roi(arr)
+        except Exception:
+            pass
         await self._iterative_center(template, max_iters=max_iters, pixel_tol=pixel_tol)
 
     def _get_base_global_roi(self):
@@ -223,7 +243,52 @@ class AutoTiltController(QObject):
         except Exception:
             return None
 
+    async def _get_base_reference_roi(self) -> Optional[np.ndarray]:
+        """获取基础参考ROI：优先倾转序列首个 ReferenceImage，其次目标级 ReferenceImage；
+        若都不存在，则从当前帧按 rect 裁剪并缓存为 ReferenceImage。"""
+        try:
+            # 1) 倾转序列首个 ReferenceImage
+            if getattr(self.target, 'tilt_reference_series', None) and len(self.target.tilt_reference_series) > 0:
+                img = self.target.tilt_reference_series[0].image
+                if img is not None:
+                    return self._prepare_template_roi(np.ascontiguousarray(img))
+            # 2) 目标级 ReferenceImage 列表
+            if getattr(self.target, 'reference_images', None) and len(self.target.reference_images) > 0:
+                img = self.target.reference_images[0].image
+                if img is not None:
+                    return self._prepare_template_roi(np.ascontiguousarray(img))
+            # 3) 动态建立：采一帧并按 rect 裁剪
+            frame = await self.api.acquire_frame()
+            if frame is None:
+                return None
+            rect = getattr(self.target, 'rect', None)
+            ref_roi = None
+            if rect and isinstance(rect, (list, tuple)) and len(rect) == 4:
+                x, y, w, h = rect
+                try:
+                    x0 = max(0, int(x)); y0 = max(0, int(y))
+                    x1 = min(int(x + w), int(frame.shape[1])); y1 = min(int(y + h), int(frame.shape[0]))
+                    if x1 > x0 and y1 > y0:
+                        ref_roi = frame[y0:y1, x0:x1].copy()
+                except Exception:
+                    ref_roi = None
+            if ref_roi is None:
+                ref_roi = np.ascontiguousarray(frame)
+            # 缓存为 ReferenceImage
+            try:
+                snap = await self.api.get_snapshot()
+                pose = self._extract_stage_pose(snap)
+                from model.targets import ReferenceImage
+                self.target.reference_images.append(ReferenceImage(image=ref_roi, pose=pose))
+            except Exception:
+                pass
+            return self._prepare_template_roi(ref_roi)
+        except Exception:
+            return None
+
     def _simulate_vertical_scaling(self, arr: np.ndarray, alpha_deg: float, base_alpha_deg: float) -> Optional[np.ndarray]:
+        """仅对竖直方向按 cos(alpha) 比例缩放，但以图像中心为锚点，并保持输出高度不变，
+        以避免因以顶边为原点插值导致的高角时向上漂移。"""
         try:
             if arr is None:
                 return None
@@ -234,16 +299,22 @@ class AutoTiltController(QObject):
             if cb == 0:
                 cb = 1.0
             scale = float(ca / cb)
-            scale = max(0.1, min(2.0, scale))  # 简单限幅，避免极端情况
-            new_h = max(1, int(round(h * scale)))
-            # 逐列线性插值到 new_h
+            scale = max(0.1, min(2.0, scale))  # 限幅
+
+            # 以中心对齐的插值：输出高度与输入相同，避免模板尺寸变化引入偏差
+            cy = (h - 1) * 0.5
             y_old = np.linspace(0.0, float(h - 1), num=h, dtype=np.float64)
-            y_new = np.linspace(0.0, float(h - 1), num=new_h, dtype=np.float64)
-            out = np.empty((new_h, w), dtype=np.float64)
+            y_out = np.arange(h, dtype=np.float64)
+            # 中心对齐映射：y_in = (y_out - cy)/scale + cy
+            y_in = (y_out - cy) / scale + cy
+            y_in = np.clip(y_in, 0.0, float(h - 1))
+
+            out = np.empty((h, w), dtype=np.float64)
             for c in range(w):
                 col = arr[:, c]
                 colf = col.astype(np.float64, copy=False)
-                out[:, c] = np.interp(y_new / scale, y_old, colf, left=colf[0], right=colf[-1])
+                out[:, c] = np.interp(y_in, y_old, colf, left=colf[0], right=colf[-1])
+
             # 尝试保持原 dtype（若为 uint8/uint16），否则回退为 float32
             if arr.dtype == np.uint8 or arr.dtype == np.uint16:
                 out = np.clip(out, 0, 65535.0)
@@ -289,6 +360,95 @@ class AutoTiltController(QObject):
             # 小憩
             import asyncio
             await asyncio.sleep(0.2)
+
+    async def _stability_and_recenter(self, alpha_target_deg: float, max_checks: int = 3, wait_seconds: float = 3.0, pixel_tol: float = 10.0):
+        """归中完成后等待若干秒再次采样，若相对模板的像素偏移超过阈值则再次归中，直至稳定或达到上限。"""
+        try:
+            # 使用模拟到当前角度的 Global ROI 作为稳定性检测模板
+            template = self._get_simulated_global_roi_for_alpha(alpha_target_deg)
+            if template is None:
+                return
+            import asyncio
+            checks = 0
+            while checks < int(max_checks) and not self._cancel:
+                checks += 1
+                # 等待稳定
+                try:
+                    self._logger.info(f"[AT] stability check {checks}/{max_checks}: waiting {float(wait_seconds)}s before sampling")
+                except Exception:
+                    pass
+                await asyncio.sleep(float(wait_seconds))
+                # 采样设置超时，避免 acquire_cardinal 阻塞过久
+                try:
+                    frame = await asyncio.wait_for(self.api.acquire_frame(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    try:
+                        self._logger.warning("[AT] stability acquire_frame timeout (2s); retrying next check")
+                    except Exception:
+                        pass
+                    continue
+                if frame is None:
+                    try:
+                        self._logger.warning("[AT] stability acquire_frame returned None; retrying next check")
+                    except Exception:
+                        pass
+                    continue
+                try:
+                    roi, (_, _), (drow, dcol) = extract_pattern(template, frame)
+                except Exception:
+                    # 若匹配失败，尝试再次归中一次
+                    await self._iterative_center_nearby_alpha(alpha_target_deg=alpha_target_deg, max_iters=4, pixel_tol=pixel_tol)
+                    continue
+                drift = float((drow ** 2 + dcol ** 2) ** 0.5)
+                try:
+                    self._logger.info(f"[AT] stability drift=\u0394px {drift:.2f} (tol={float(pixel_tol):.2f})")
+                except Exception:
+                    pass
+                if drift <= float(pixel_tol):
+                    break
+                # 重新归中一次
+                await self._iterative_center_nearby_alpha(alpha_target_deg=alpha_target_deg, max_iters=6, pixel_tol=pixel_tol)
+        except Exception:
+            pass
+
+    def _get_simulated_global_roi_for_alpha(self, alpha_target_deg: float) -> Optional[np.ndarray]:
+        try:
+            base_template = self._get_base_global_roi()
+            if base_template is None:
+                return None
+            try:
+                base_alpha = float(self.target.tilt_alpha_series[0]) if getattr(self.target, 'tilt_alpha_series', None) and len(self.target.tilt_alpha_series) > 0 else 0.0
+            except Exception:
+                base_alpha = 0.0
+            scaled = self._simulate_vertical_scaling(base_template, float(alpha_target_deg), float(base_alpha))
+            templ = scaled if scaled is not None else base_template
+            return self._prepare_template_roi(templ)
+        except Exception:
+            return None
+
+    def _prepare_template_roi(self, arr: np.ndarray) -> np.ndarray:
+        """将参考图像裁剪为适中的中心 ROI，避免模板过大导致相关匹配过慢。
+        默认最大尺寸设为 512x512。"""
+        try:
+            import numpy as np
+            a = np.asarray(arr)
+            if a.ndim == 3:
+                a = a.mean(axis=2)
+            h, w = int(a.shape[0]), int(a.shape[1])
+            max_side = 512
+            th = min(h, max_side)
+            tw = min(w, max_side)
+            if th == h and tw == w:
+                return np.ascontiguousarray(a)
+            cy = h // 2
+            cx = w // 2
+            y0 = max(0, cy - th // 2)
+            x0 = max(0, cx - tw // 2)
+            y1 = min(h, y0 + th)
+            x1 = min(w, x0 + tw)
+            return np.ascontiguousarray(a[y0:y1, x0:x1])
+        except Exception:
+            return arr
 
     async def _capture_and_store(self, alpha_deg: float, use_hr: bool, hr_mag_override: Optional[float] = None):
         # 可选切换倍率
@@ -407,32 +567,59 @@ class AutoTiltController(QObject):
         except Exception:
             pass
 
-    def _get_current_alpha_deg_fallback(self) -> float:
+    async def _get_current_alpha_deg(self) -> float:
+        """读取当前 stage.a（弧度）并转换为度，失败返回 0.0。"""
         try:
-            import math
-            state = None
-            # 无 await：用于初始记录时的兜底；允许返回0
-            return 0.0
+            state = await self.api.get_stage_position()
+            pos = state.get('position', state) if isinstance(state, dict) else {}
+            a_rad = float(pos.get('a', 0.0) or 0.0)
+            return float(a_rad * 180.0 / np.pi)
         except Exception:
-            return 0.0
+            # 回退：尝试从快照读取
+            try:
+                snap = await self.api.get_snapshot()
+                pos = (snap or {}).get('stage', {}).get('position', {}) if isinstance(snap, dict) else {}
+                a_rad = float(pos.get('a', 0.0) or 0.0)
+                return float(a_rad * 180.0 / np.pi)
+            except Exception:
+                return 0.0
 
     async def _run_autofocus_with_nearest_reference(self, alpha_deg: float):
         try:
-            # 始终使用“首帧”的参考ROI，必要时按 alpha 做竖直缩放，避免逐角度累积偏移
+            # 使用 Reference image 作为自动聚焦对象：选择与当前角度最近邻的参考图
             scaled_image = None
-            base_ref = None
-            if getattr(self.target, 'tilt_reference_series', None) and len(self.target.tilt_reference_series) > 0:
-                base_ref = self.target.tilt_reference_series[0]
+            base_ref_img = None
+            # 1) 从倾转序列中找离 alpha_deg 最近的 ReferenceImage
+            try:
+                if getattr(self.target, 'tilt_alpha_series', None) and getattr(self.target, 'tilt_reference_series', None):
+                    alphas = list(self.target.tilt_alpha_series)
+                    refs = list(self.target.tilt_reference_series)
+                    if len(alphas) == len(refs) and len(alphas) > 0:
+                        import numpy as np
+                        arr_a = np.asarray(alphas, dtype=float)
+                        idx = int(np.argmin(np.abs(arr_a - float(alpha_deg))))
+                        base_ref_img = getattr(refs[idx], 'image', None)
+            except Exception:
+                base_ref_img = None
+            # 2) 回退：目标级 Reference 列表（用最近一次）
+            if base_ref_img is None and getattr(self.target, 'reference_images', None):
                 try:
-                    base_alpha = float(self.target.tilt_alpha_series[0]) if getattr(self.target, 'tilt_alpha_series', None) and len(self.target.tilt_alpha_series) > 0 else 0.0
+                    base_ref_img = self.target.reference_images[-1].image if len(self.target.reference_images) > 0 else None
                 except Exception:
-                    base_alpha = 0.0
-                # 尝试将首帧参考按照当前 alpha 做竖直缩放（与迭代归中一致的近似）
-                scaled_image = self._simulate_vertical_scaling(np.ascontiguousarray(base_ref.image), float(alpha_deg), float(base_alpha)) if getattr(base_ref, 'image', None) is not None else None
-            # 无法获取首帧参考时，退化到“最初的 Global ROI”
-            if scaled_image is None:
-                alt = self._get_base_global_roi()
-                scaled_image = alt if alt is not None else None
+                    base_ref_img = None
+            # 3) 仍无参考：动态建立基础 Reference ROI
+            if base_ref_img is None:
+                base_ref_img = await self._get_base_reference_roi()
+            # 将参考按当前角度模拟（中心锚定竖直缩放，基础角取序列首个）
+            if base_ref_img is not None:
+                try:
+                    try:
+                        base_alpha = float(self.target.tilt_alpha_series[0]) if getattr(self.target, 'tilt_alpha_series', None) and len(self.target.tilt_alpha_series) > 0 else 0.0
+                    except Exception:
+                        base_alpha = 0.0
+                    scaled_image = self._simulate_vertical_scaling(np.ascontiguousarray(base_ref_img), float(alpha_deg), float(base_alpha))
+                except Exception:
+                    scaled_image = None
             # 将该参考临时追加到 target.reference_images 末尾，供自动聚焦使用
             if scaled_image is not None:
                 try:
@@ -440,13 +627,35 @@ class AutoTiltController(QObject):
                     self.target.reference_images.append(ReferenceImage(image=scaled_image, pose=StagePose()))
                 except Exception:
                     pass
-            from autofocus.controller import AutofocusController
             from autofocus.config import AutofocusSettings
             af_cfg = AutofocusSettings.from_dict(self.af_settings_dict)
-            af = AutofocusController(self.api, self.target, af_cfg, parent=None)
+            algo = str(self.af_settings_dict.get('algorithm', 'basic')).lower()
+            # 根据 main_window 中的设定选择自动聚焦算法
+            if algo == 'advanced':
+                from autofocus.controller_advanced import AutofocusGoldenSearchController
+                af = AutofocusGoldenSearchController(self.api, self.target, af_cfg, parent=self.parent())
+            else:
+                from autofocus.controller import AutofocusController
+                af = AutofocusController(self.api, self.target, af_cfg, parent=self.parent())
+
+            # 可选：桥接信号到 UI（若存在），便于在自动倾转过程中也可视化聚焦曲线/ROI
+            try:
+                parent = self.parent()
+                if parent is not None:
+                    if hasattr(parent, 'image_panel') and parent.image_panel:
+                        af.frame.connect(lambda arr: parent.image_panel.set_image_array(arr))
+                    if hasattr(parent, 'info_panel') and parent.info_panel:
+                        if hasattr(parent.info_panel, 'update_focus_curves'):
+                            af.focusCurvesUpdated.connect(lambda rx, ry, sx, sy: parent.info_panel.update_focus_curves(rx, ry, sx, sy))
+                        if hasattr(parent.info_panel, 'set_sample_roi'):
+                            af.sampleROI.connect(parent.info_panel.set_sample_roi)
+                    # 复用主窗口的聚焦点追加方法（含单位转换/节流逻辑）
+                    if hasattr(parent, '_on_focus_metric'):
+                        af.focusMetric.connect(parent._on_focus_metric)
+            except Exception:
+                pass
+
             # 直接运行一次（同步等待）
-            # await af._coarse_search()
-            # await af._fine_search()
             await af._run()
         except Exception:
             pass

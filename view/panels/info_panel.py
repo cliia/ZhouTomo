@@ -19,6 +19,11 @@ class InfoPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._build_ui()
+        # 节流定时器：聚焦曲线重绘集中处理，避免高频信号造成UI卡顿
+        self._focus_redraw_timer = QTimer(self)
+        self._focus_redraw_timer.setSingleShot(True)
+        self._focus_redraw_timer.setInterval(50)  # 50ms内聚合多次更新
+        self._focus_redraw_timer.timeout.connect(self._redraw_focus_curve)
 
 
     def _build_ui(self):
@@ -71,15 +76,24 @@ class InfoPanel(QWidget):
         self.focus_canvas = FigureCanvas(self.focus_figure)
         self.focus_ax = self.focus_figure.add_subplot(111)
         self.focus_ax.set_facecolor(colors.LIGHT_BACKGROUND)
-        # 删除 spines
-        self.focus_ax.spines['top'].set_visible(False)
-        self.focus_ax.spines['right'].set_visible(False)
-        self.focus_ax.spines['bottom'].set_visible(False)
-        self.focus_ax.spines['left'].set_visible(False)
-        # 设置 ticks
-        self.focus_ax.set_xticks([])
-        self.focus_ax.set_yticks([])
-        # 设置标签
+        # 轴字体与边距设置（确保标签可见）
+        self._focus_font = {'family': 'Arial', 'size': 14}
+        try:
+            self.focus_figure.subplots_adjust(left=0.18, bottom=0.22, right=0.98, top=0.98)
+        except Exception:
+            pass
+        # 恢复 spines 并设置线宽
+        try:
+            for sp in self.focus_ax.spines.values():
+                sp.set_visible(True)
+                sp.set_linewidth(1)
+        except Exception:
+            pass
+        # 恢复刻度显示并设置字体大小
+        try:
+            self.focus_ax.tick_params(axis='both', labelsize=self._focus_font['size'])
+        except Exception:
+            pass
         self.focus_figure.patch.set_facecolor('none')
         self.focus_figure.tight_layout()
         self._focus_x = []
@@ -333,6 +347,21 @@ class InfoPanel(QWidget):
         try:
             self.focus_ax.cla()
             self.focus_ax.set_facecolor(colors.LIGHT_BACKGROUND)
+            # 统一样式（字体、spines、刻度与边距）
+            try:
+                self.focus_figure.subplots_adjust(left=0.18, bottom=0.22, right=0.98, top=0.98)
+            except Exception:
+                pass
+            try:
+                for sp in self.focus_ax.spines.values():
+                    sp.set_visible(True)
+                    sp.set_linewidth(1)
+            except Exception:
+                pass
+            try:
+                self.focus_ax.tick_params(axis='both', labelsize=self._focus_font['size'])
+            except Exception:
+                pass
             self.focus_canvas.draw_idle()
             self.roi_ax.cla(); self.roi_ax.axis('off'); self.roi_canvas.draw_idle()
         except Exception:
@@ -342,42 +371,71 @@ class InfoPanel(QWidget):
         try:
             self._focus_x.append(float(defocus_um))
             self._focus_y.append(float(definition_value))
-            # 绘制曲线
-            self.focus_ax.cla()
-            self.focus_ax.set_facecolor(colors.LIGHT_BACKGROUND)
-            if len(self._focus_x) >= 1:
-                pairs = sorted(zip(self._focus_x, self._focus_y), key=lambda p: p[0])
-                xs, ys = zip(*pairs)
-                self.focus_ax.plot(xs, ys, color='orange', linewidth=1.5, marker='o', markersize=3)
-                self.focus_ax.grid(True, alpha=0.2)
-                self.focus_ax.set_xlabel('Defocus (um)')
-                self.focus_ax.set_ylabel('Definition')
-            self.focus_canvas.draw_idle()
+            # 触发节流重绘
+            if not self._focus_redraw_timer.isActive():
+                self._focus_redraw_timer.start()
         except Exception:
             pass
 
     def update_focus_curves(self, raw_x_m: list, raw_y: list, smooth_x_m: list, smooth_y: list):
         try:
-            # 将米转换为微米以匹配坐标轴
-            rx = [float(v) * 1e6 for v in (raw_x_m or [])]
-            sx = [float(v) * 1e6 for v in (smooth_x_m or [])]
-            ry = [float(v) for v in (raw_y or [])]
-            sy = [float(v) for v in (smooth_y or [])]
+            # 覆盖为最新曲线数据缓存（以便节流重绘）
+            self._focus_raw_x_m = list(map(float, raw_x_m or []))
+            self._focus_raw_y = list(map(float, raw_y or []))
+            self._focus_smooth_x_m = list(map(float, smooth_x_m or []))
+            self._focus_smooth_y = list(map(float, smooth_y or []))
+            if not self._focus_redraw_timer.isActive():
+                self._focus_redraw_timer.start()
+        except Exception:
+            pass
+
+    def _redraw_focus_curve(self):
+        """集中重绘聚焦曲线，合并 append_focus_point 与 update_focus_curves 的更新。"""
+        try:
             self.focus_ax.cla()
             self.focus_ax.set_facecolor(colors.LIGHT_BACKGROUND)
+            # 统一样式（字体、spines、刻度与边距）
+            try:
+                self.focus_figure.subplots_adjust(left=0.18, bottom=0.22, right=0.98, top=0.98)
+            except Exception:
+                pass
+            try:
+                for sp in self.focus_ax.spines.values():
+                    sp.set_visible(True)
+                    sp.set_linewidth(1)
+            except Exception:
+                pass
+            try:
+                self.focus_ax.tick_params(axis='both', labelsize=self._focus_font['size'])
+            except Exception:
+                pass
+            # 先绘制原始采样点（append_focus_point 累积的点）
+            if len(self._focus_x) >= 1 and len(self._focus_y) == len(self._focus_x):
+                pairs_local = sorted(zip(self._focus_x, self._focus_y), key=lambda p: p[0])
+                xs_l, ys_l = zip(*pairs_local)
+                self.focus_ax.plot(xs_l, ys_l, color='orange', linewidth=1.0, marker='o', markersize=3, label='raw(local)')
+            # 再绘制控制器提供的平滑曲线（若有）
+            rx = [v * 1e6 for v in getattr(self, '_focus_raw_x_m', [])]
+            ry = list(getattr(self, '_focus_raw_y', []))
+            sx = [v * 1e6 for v in getattr(self, '_focus_smooth_x_m', [])]
+            sy = list(getattr(self, '_focus_smooth_y', []))
             if rx and ry:
                 pairs = sorted(zip(rx, ry), key=lambda p: p[0])
                 xs, ys = zip(*pairs)
-                self.focus_ax.plot(xs, ys, color='orange', linewidth=1.0, marker='o', markersize=3, label='raw')
+                self.focus_ax.plot(xs, ys, color='chocolate', linewidth=1.0, marker='.', markersize=2, alpha=0.7, label='raw(controller)')
             if sx and sy:
                 pairs_s = sorted(zip(sx, sy), key=lambda p: p[0])
                 xs2, ys2 = zip(*pairs_s)
                 self.focus_ax.plot(xs2, ys2, color='steelblue', linewidth=1.5, label='smoothed')
             self.focus_ax.grid(True, alpha=0.2)
-            self.focus_ax.set_xlabel('Defocus (um)')
-            self.focus_ax.set_ylabel('Definition')
-            if (rx and ry) or (sx and sy):
-                self.focus_ax.legend(loc='best', fontsize=8)
+            self.focus_ax.set_xlabel('Defocus (um)', fontdict=self._focus_font)
+            self.focus_ax.set_ylabel('Definition', fontdict=self._focus_font)
+            has_any = (len(self._focus_x) > 0) or (rx and ry) or (sx and sy)
+            if has_any:
+                try:
+                    self.focus_ax.legend(loc='best', prop={'family': self._focus_font['family'], 'size': self._focus_font['size']})
+                except Exception:
+                    self.focus_ax.legend(loc='best', fontsize=self._focus_font['size'])
             self.focus_canvas.draw_idle()
         except Exception:
             pass
