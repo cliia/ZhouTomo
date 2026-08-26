@@ -8,7 +8,7 @@ dependencies = [
     "PyQt5>=5.15",
     "qasync>=0.24",
     "matplotlib>=3.8",
-    "numpy>=1.24,<2",
+    "numpy>=1.24",
     "pillow>=10.0",
     "aiohttp>=3.8",
     "websockets>=12.0",
@@ -44,3 +44,7 @@ include-package-data = true
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["zhoutomo_client*", "view*", "config*", "autofocus*", "autotilt*", "model*", "strategy*", "src*"]
+
+[tool.setuptools.package-data]
+src = ["*.mat"]
+resources = ["**/*"]
