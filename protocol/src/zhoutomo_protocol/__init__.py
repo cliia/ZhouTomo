@@ -1,5 +1,15 @@
 """Shared client/server protocol for ZhouTomo."""
 
+from .api import (
+    CommandRequest,
+    CommandResponse,
+    ComponentParamsRequest,
+    ErrorResponse,
+    FrameData,
+    HealthResponse,
+)
+from .errors import ErrorCode
+from .events import Event, FrameEvent
 from .models import (
     AcquisitionParams,
     AcquisitionState,
@@ -43,8 +53,17 @@ __all__ = [
     "CameraParams",
     "CameraState",
     "CameraStatus",
+    "CommandRequest",
+    "CommandResponse",
+    "ComponentParamsRequest",
+    "ErrorCode",
+    "ErrorResponse",
+    "Event",
+    "FrameData",
+    "FrameEvent",
     "GunParams",
     "GunState",
+    "HealthResponse",
     "IlluminationParams",
     "IlluminationState",
     "MicroscopeMode",
