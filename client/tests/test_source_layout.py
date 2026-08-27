@@ -8,7 +8,11 @@ import zhoutomo_client
 
 def test_client_src_contains_only_package_namespace():
     src_dir = Path(__file__).resolve().parents[1] / "src"
-    entries = {path.name for path in src_dir.iterdir() if path.name != "__pycache__"}
+    entries = {
+        path.name
+        for path in src_dir.iterdir()
+        if path.name != "__pycache__" and not path.name.endswith(".egg-info")
+    }
     assert entries == {"zhoutomo_client"}
 
 

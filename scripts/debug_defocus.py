@@ -5,7 +5,7 @@
 调试脚本：测试 GET/SET defocus 是否生效，并输出详细调试信息。
 
 用法示例：
-  python debug_defocus.py --url http://169.254.225.233:9000 --values -5e-8 0 5e-8
+  uv run --project client python scripts/debug_defocus.py --url http://169.254.225.233:9000 --values -5e-8 0 5e-8
 
 注意：
 - 脚本会依次尝试多组 defocus 绝对值（单位：米）。
@@ -19,7 +19,7 @@ import sys
 import traceback
 from typing import List
 
-from agent_client import AgentClient, AgentClientError
+from zhoutomo_client.api import AgentClient, AgentClientError
 
 
 def _fmt(v):
@@ -76,7 +76,6 @@ async def _set_defocus_body_flat(client: AgentClient, value: float):
 async def _run_once(url: str, values: List[float], tol: float):
     print(f"[INFO] connecting: {url}")
     async with AgentClient(url) as client:
-        # 健康/版本
         try:
             health = await client.get_health()
             print("[health]", json.dumps(health, ensure_ascii=False))
@@ -88,14 +87,12 @@ async def _run_once(url: str, values: List[float], tol: float):
         except Exception as e:
             print("[version] error:", e)
 
-        # 初始状态
         print("\n==== INITIAL STATE ====")
-        init_df = await _get_defocus(client)
+        await _get_defocus(client)
 
         for idx, target in enumerate(values, 1):
             print("\n===== CASE", idx, "SET ->", _fmt(target), "(m) =====")
 
-            # 方案A：{"params": {"defocus": m}}
             okA = await _set_defocus_body_params(client, target)
             new_dfA = await _get_defocus(client)
             deltaA = None
@@ -106,7 +103,6 @@ async def _run_once(url: str, values: List[float], tol: float):
                 pass
             print(f"[CHECK A] target={_fmt(target)} now={_fmt(new_dfA)} delta={_fmt(deltaA)} ok={okA}")
 
-            # 若A未落地，再试方案B：扁平体
             if not (isinstance(deltaA, float) and abs(deltaA) <= tol):
                 okB = await _set_defocus_body_flat(client, target)
                 new_dfB = await _get_defocus(client)
@@ -148,5 +144,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

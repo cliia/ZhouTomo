@@ -6,7 +6,8 @@ AgentClient使用示例
 
 import asyncio
 import logging
-from agent_client import AgentClient, AgentClientError
+
+from zhoutomo_client.api import AgentClient, AgentClientError
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -209,25 +210,13 @@ async def main():
     print("ZhouTomo AgentClient 使用示例")
     print("=" * 50)
     
-    # # 运行所有示例
-    # examples = [
-    #     basic_usage_example,
-    #     microscope_control_example,
-    #     parameter_setting_example,
-    #     acquisition_control_example,
-    #     websocket_streaming_example,
-    #     error_handling_example,
-    #     performance_test_example
-    # ]
-
     # 统一以“协程函数”形式收集，循环中再调用获得协程对象
     examples = [microscope_control_example, parameter_setting_example]
     
     for example in examples:
         try:
-            # 调用协程函数以获得协程对象，再 await
             await example()
-            print()  # 空行分隔
+            print()
         except Exception as e:
             print(f"示例 {example.__name__} 执行失败: {e}")
             print()
@@ -236,11 +225,9 @@ async def main():
 
 
 if __name__ == "__main__":
-    # 运行示例
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n用户中断执行")
     except Exception as e:
         print(f"执行失败: {e}")
-
