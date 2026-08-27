@@ -5,7 +5,10 @@ description = "ZhouTomo desktop client and acquisition workflows"
 requires-python = ">=3.10,<3.11"
 dependencies = [
     "zhoutomo-protocol",
-    "PyQt5>=5.15",
+    # Newer PyQt5-Qt5 releases do not currently publish Windows wheels.
+    # Pin the Qt runtime explicitly for the Windows desktop client.
+    "PyQt5==5.15.11",
+    "PyQt5-Qt5==5.15.2",
     "qasync>=0.24",
     "matplotlib>=3.8",
     "numpy>=1.24",
