@@ -60,3 +60,62 @@ jobs:
       - run: uv sync --extra dev
       - run: uv run pytest tests
       - run: uv run python -c "import zhoutomo_client; import zhoutomo_protocol"
+
+  integration:
+    name: Client + Null Server
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install server
+        working-directory: server
+        run: uv sync --extra dev
+
+      - name: Install client
+        working-directory: client
+        run: uv sync --extra dev
+
+      - name: Run black-box integration tests
+        shell: pwsh
+        env:
+          ZHOUTOMO_TEST_SERVER_URL: http://127.0.0.1:9000
+        run: |
+          $server = Start-Process -FilePath "uv" `
+            -ArgumentList @("run", "zhoutomo-server", "--mode", "null", "--host", "127.0.0.1", "--port", "9000") `
+            -WorkingDirectory "${{ github.workspace }}\server" `
+            -PassThru `
+            -WindowStyle Hidden
+
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:9000/health" -TimeoutSec 2
+                if ($health.status -eq "healthy") {
+                  $ready = $true
+                  break
+                }
+              } catch {
+                Start-Sleep -Seconds 1
+              }
+            }
+
+            if (-not $ready) {
+              throw "Null server did not become healthy on port 9000"
+            }
+
+            Push-Location "${{ github.workspace }}\client"
+            try {
+              uv run pytest ..\tests\integration
+            } finally {
+              Pop-Location
+            }
+          } finally {
+            if ($server -and -not $server.HasExited) {
+              taskkill /PID $server.Id /T /F | Out-Null
+            }
+          }
