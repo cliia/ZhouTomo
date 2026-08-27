@@ -1,7 +1,6 @@
-"""Guard the client src-layout and temporary migration aliases."""
+"""Guard the canonical client src-layout."""
 
 from pathlib import Path
-import sys
 
 import zhoutomo_client
 
@@ -16,19 +15,9 @@ def test_client_src_contains_only_package_namespace():
     assert entries == {"zhoutomo_client"}
 
 
-def test_legacy_import_names_are_aliases_not_top_level_packages():
-    expected = {
-        "agent_client": "zhoutomo_client.api.client",
-        "config": "zhoutomo_client.config",
-        "model": "zhoutomo_client.models",
-        "resources": "zhoutomo_client.resources",
-        "src": "zhoutomo_client.processing.legacy",
-        "strategy": "zhoutomo_client.strategies",
-        "view": "zhoutomo_client.ui",
-        "autofocus": "zhoutomo_client.workflows.autofocus",
-        "autotilt": "zhoutomo_client.workflows.autotilt",
-    }
-    for legacy_name, canonical_name in expected.items():
-        assert sys.modules[legacy_name].__name__ == canonical_name
-
+def test_migration_compatibility_modules_are_gone():
+    package_dir = Path(zhoutomo_client.__file__).resolve().parent
+    assert not (package_dir / "compat.py").exists()
+    assert not (package_dir / "workflows" / "autofocus.py").exists()
+    assert not (package_dir / "workflows" / "autotilt.py").exists()
     assert zhoutomo_client.AgentClient.__module__ == "zhoutomo_client.api.client"

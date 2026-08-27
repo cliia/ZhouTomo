@@ -1,42 +1,34 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-ZhouTomo 图像处理工具 - 主程序入口
-"""
+"""ZhouTomo desktop client entry point."""
 
-import sys
-import os
-import logging
 import asyncio
+import logging
+import sys
+
 import qasync
 from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QTimer
 
-# 添加view模块到路径
-sys.path.append(os.path.join(os.path.dirname(__file__), 'view'))
+from zhoutomo_client.config.colors import colors
+from zhoutomo_client.ui.main_window import MainWindow
+from zhoutomo_client.ui.splash_screen import SplashScreen
 
-from view.splash_screen import SplashScreen
-from view.main_window import MainWindow
-from config.colors import colors
-
-# 配置日志
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('main.log', encoding='utf-8')
+        logging.FileHandler("main.log", encoding="utf-8"),
     ],
-    force=True
+    force=True,
 )
 logger = logging.getLogger(__name__)
 
 
 def main():
-    """主程序入口函数"""
+    """Run the ZhouTomo Qt desktop application."""
     app = QApplication(sys.argv)
-    
-    # 全局滚动条样式（统一扁平化风格）
+
     def _build_global_scrollbar_qss():
         return f"""
         QScrollBar:vertical {{
@@ -90,33 +82,23 @@ def main():
 
     qss = _build_global_scrollbar_qss()
     app.setStyleSheet(app.styleSheet() + qss if app.styleSheet() else qss)
-    
-    # 创建并显示启动画面
+
     splash = SplashScreen()
-    
-    # 创建主窗口（但不立即显示）
     main_window = None
-    
+
     def on_initialization_complete():
-        """初始化完成后的回调"""
         nonlocal main_window
-        
-        # 创建主窗口
         main_window = MainWindow()
-        
-        # 结束启动画面并显示主窗口
         splash.finish_splash(main_window)
         main_window.show()
-    
-    # 连接初始化完成信号
+
     splash.initializationComplete.connect(on_initialization_complete)
-    
-    # 使用 qasync 集成 Qt 与 asyncio，避免异步任务阻塞 UI
+
     loop = qasync.QEventLoop(app)
     asyncio.set_event_loop(loop)
     with loop:
         return loop.run_forever()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
