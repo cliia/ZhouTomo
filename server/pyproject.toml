@@ -37,7 +37,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["domain", "wiring", "ports_temscript", "server_fastapi", "run_agent"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
