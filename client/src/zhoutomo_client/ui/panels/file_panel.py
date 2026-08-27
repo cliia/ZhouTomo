@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt, QSize, pyqtSignal
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QListWidget, QListWidgetItem, QListView, QAbstractItemView, QSizePolicy, QMenu, QAction, QInputDialog, QGridLayout, QHBoxLayout, QRadioButton
 from PyQt5.QtGui import QPixmap
 
-from config.colors import colors
+from zhoutomo_client.config.colors import colors
 
 
 class FilePanel(QWidget):

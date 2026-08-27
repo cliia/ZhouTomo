@@ -1,3 +1,3 @@
 """Subject-tracking compatibility facade."""
 
-from src.subject_tracker import *
+from zhoutomo_client.processing.legacy.subject_tracker import *

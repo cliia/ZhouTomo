@@ -5,11 +5,11 @@ from typing import Optional, Dict, Any, List, Tuple
 import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from autofocus.microscope_api import MicroscopeAPI
-from model.targets import TargetModel, StagePose
-from src.utils import mag2ps
-from src.normxcorr2 import extract_pattern
-from src.subject_tracker import detect_subject
+from zhoutomo_client.workflows.autofocus.microscope_api import MicroscopeAPI
+from zhoutomo_client.models.targets import TargetModel, StagePose
+from zhoutomo_client.processing.legacy.utils import mag2ps
+from zhoutomo_client.processing.legacy.normxcorr2 import extract_pattern
+from zhoutomo_client.processing.legacy.subject_tracker import detect_subject
 import logging
 
 
@@ -293,7 +293,7 @@ class AutoTiltController(QObject):
             try:
                 snap = await self.api.get_snapshot()
                 pose = self._extract_stage_pose(snap)
-                from model.targets import ReferenceImage
+                from zhoutomo_client.models.targets import ReferenceImage
                 self.target.reference_images.append(ReferenceImage(image=ref_roi, pose=pose))
             except Exception:
                 pass
@@ -593,7 +593,7 @@ class AutoTiltController(QObject):
                 if getattr(self.target, 'tilt_highres_series', None) and len(self.target.tilt_highres_series) > 0 \
                    and len(self.target.tilt_alpha_series) > 0:
                     # 用新的 HR GlobalImage 覆盖最后一项
-                    from model.targets import GlobalImage
+                    from zhoutomo_client.models.targets import GlobalImage
                     self.target.tilt_highres_series[-1] = GlobalImage(image=frame, magnification=current_mag)
                 else:
                     # 若无条目，创建一条（HR 与 Global 相同）
@@ -697,19 +697,19 @@ class AutoTiltController(QObject):
             # 用“替换”的方式提供参考，避免不断追加造成参考随时间漂移
             if scaled_image is not None:
                 try:
-                    from model.targets import ReferenceImage, StagePose
+                    from zhoutomo_client.models.targets import ReferenceImage, StagePose
                     self.target.reference_images = [ReferenceImage(image=scaled_image, pose=StagePose())]
                 except Exception:
                     pass
-            from autofocus.config import AutofocusSettings
+            from zhoutomo_client.workflows.autofocus.config import AutofocusSettings
             af_cfg = AutofocusSettings.from_dict(self.af_settings_dict)
             algo = str(self.af_settings_dict.get('algorithm', 'basic')).lower()
             # 根据 main_window 中的设定选择自动聚焦算法
             if algo == 'advanced':
-                from autofocus.controller_advanced import AutofocusGoldenSearchController
+                from zhoutomo_client.workflows.autofocus.controller_advanced import AutofocusGoldenSearchController
                 af = AutofocusGoldenSearchController(self.api, self.target, af_cfg, parent=self.parent())
             else:
-                from autofocus.controller import AutofocusController
+                from zhoutomo_client.workflows.autofocus.controller import AutofocusController
                 af = AutofocusController(self.api, self.target, af_cfg, parent=self.parent())
 
             # 可选：桥接信号到 UI（若存在），便于在自动倾转过程中也可视化聚焦曲线/ROI

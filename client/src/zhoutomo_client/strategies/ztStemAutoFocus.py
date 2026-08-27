@@ -4,14 +4,14 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.ndimage import gaussian_filter1d
 
-from strategy.ztDefinitionEvaluator import ZtDefinitionEvaluator
-from strategy.ztDenoiser import ZtDenoiser
-from strategy.ztStemStrategy import ZtStemStrategies
-from model.ztMicroscope import ZtBaseMicroscope
-from model.ztObject import ZtObject
-from model.ztImage import ZtImage
-from src.utils import is_monotonic, imrescale
-from src.normxcorr2 import extract_pattern
+from zhoutomo_client.strategies.ztDefinitionEvaluator import ZtDefinitionEvaluator
+from zhoutomo_client.strategies.ztDenoiser import ZtDenoiser
+from zhoutomo_client.strategies.ztStemStrategy import ZtStemStrategies
+from zhoutomo_client.models.ztMicroscope import ZtBaseMicroscope
+from zhoutomo_client.models.ztObject import ZtObject
+from zhoutomo_client.models.ztImage import ZtImage
+from zhoutomo_client.processing.legacy.utils import is_monotonic, imrescale
+from zhoutomo_client.processing.legacy.normxcorr2 import extract_pattern
 from ztthread import ZtControlThread
 
 

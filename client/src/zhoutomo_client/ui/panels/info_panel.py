@@ -11,7 +11,7 @@ from PyQt5.QtGui import QColor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-from config.colors import colors
+from zhoutomo_client.config.colors import colors
 import numpy as np
 
 

@@ -7,7 +7,7 @@ import numpy as np
 import logging
 
 try:
-    from agent_client import AgentClient
+    from zhoutomo_client.api import AgentClient
 except Exception:
     AgentClient = None
 

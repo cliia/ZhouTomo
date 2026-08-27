@@ -1,3 +1,3 @@
 """BM3D processing compatibility facade."""
 
-from src.BM3D_Main import *
+from zhoutomo_client.processing.legacy.BM3D_Main import *

@@ -9,7 +9,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 import asyncio
 
-from agent_client import AgentClient
+from zhoutomo_client.api import AgentClient
 
 
 class AgentClientManager(QObject):
@@ -131,7 +131,7 @@ class AgentClientManager(QObject):
             try:
                 from dataclasses import is_dataclass
                 if is_dataclass(params) or hasattr(params, "__dataclass_fields__"):
-                    from domain import params_to_dict
+                    from zhoutomo_protocol import params_to_dict
                     params = params_to_dict(params)
             except Exception:
                 pass

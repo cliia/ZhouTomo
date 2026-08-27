@@ -16,7 +16,7 @@ try:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
     
-    from config.colors import colors
+    from zhoutomo_client.config.colors import colors
 except ImportError:
     # 如果无法导入，创建简单的颜色配置
     class SimpleColors:

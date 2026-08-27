@@ -1,3 +1,3 @@
 """ROI processing compatibility facade."""
 
-from src.ROI import *
+from zhoutomo_client.processing.legacy.ROI import *

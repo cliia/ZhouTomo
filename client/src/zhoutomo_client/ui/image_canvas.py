@@ -300,7 +300,7 @@ class ImageCanvas(FigureCanvas):
             px_h = px_w = '-'
             try:
                 if mag and isinstance(mag, (int, float)) and img is not None:
-                    from src.utils import mag2ps
+                    from zhoutomo_client.processing.legacy.utils import mag2ps
                     pixel_size = mag2ps(float(mag), (h, w))
                     px_h = pixel_size.get('height', '-')
                     px_w = pixel_size.get('width', '-')
@@ -318,7 +318,7 @@ class ImageCanvas(FigureCanvas):
 
             # 弹出表格
             try:
-                from view.dialogs import ImagePropertiesPopup
+                from zhoutomo_client.ui.dialogs import ImagePropertiesPopup
             except Exception:
                 ImagePropertiesPopup = None
             if ImagePropertiesPopup is None:

@@ -5,7 +5,7 @@ from scipy.ndimage import gaussian_filter1d
 
 from .normxcorr2 import extract_pattern
 from .BM3D_Main import bm3d_main
-from src import utils
+from zhoutomo_client.processing.legacy import utils
 
 
 class AutoFocusProcessor:

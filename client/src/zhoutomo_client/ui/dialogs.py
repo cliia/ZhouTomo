@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QGridLayout,
                             QPushButton, QComboBox, QSpinBox, QDoubleSpinBox, QListWidget, QListWidgetItem, QSizePolicy, QApplication)
 from PyQt5.QtCore import Qt, QSize, pyqtSignal, QPoint, QTimer
 from PyQt5.QtGui import QIcon, QPixmap, QCursor
-from domain import params_to_dict
+from zhoutomo_protocol import params_to_dict
 
 # 添加项目根目录到路径以支持绝对导入
 try:
@@ -19,8 +19,8 @@ try:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
     
-    from config.colors import colors
-    from view.widgets import HorizontalSpinBox, HorizontalDoubleSpinBox
+    from zhoutomo_client.config.colors import colors
+    from zhoutomo_client.ui.widgets import HorizontalSpinBox, HorizontalDoubleSpinBox
 except ImportError:
     # 如果无法导入，创建一个简单的替代版本
     class SimpleColors:
@@ -485,7 +485,7 @@ class ImageCapturePopup(BasePopup):
             if not state_dict or not isinstance(state_dict, dict):
                 raise ValueError("无效的acquisition状态数据")
             # 将字典转为 AcquisitionState，便于后续属性访问
-            from domain import AcquisitionState
+            from zhoutomo_protocol import AcquisitionState
             self.current_state = AcquisitionState(
                 acq_image_size=int(state_dict.get("acq_image_size", 1)),
                 dwell_time=float(state_dict.get("dwell_time", 2.0)),
@@ -503,7 +503,7 @@ class ImageCapturePopup(BasePopup):
         """同步加载当前采集状态"""
         try:
             # 获取acquisition组件的状态
-            from domain import AcquisitionState
+            from zhoutomo_protocol import AcquisitionState
             
             # 这里应该通过API获取当前状态，暂时使用默认值
             # 实际实现中应该调用 agent_manager.get_component_state("acquisition")
@@ -603,7 +603,7 @@ class ImageCapturePopup(BasePopup):
             frames = int(self.frames_combo.currentText())
             
             # 创建参数对象
-            from domain import AcquisitionParams
+            from zhoutomo_protocol import AcquisitionParams
             params = AcquisitionParams(
                 acq_image_size=acq_image_size,
                 dwell_time=dwell_time,

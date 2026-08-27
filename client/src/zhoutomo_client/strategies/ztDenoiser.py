@@ -1,7 +1,7 @@
-from model.ztImage import ZtImage
-from src.BM3D_Main import bm3d_main
-from src.imgaussfilt import imgaussfilt
-from src.utils import imnorm, imrescale
+from zhoutomo_client.models.ztImage import ZtImage
+from zhoutomo_client.processing.legacy.BM3D_Main import bm3d_main
+from zhoutomo_client.processing.legacy.imgaussfilt import imgaussfilt
+from zhoutomo_client.processing.legacy.utils import imnorm, imrescale
 
 
 class ZtDenoiser:

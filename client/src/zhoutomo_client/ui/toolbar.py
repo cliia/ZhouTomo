@@ -11,8 +11,8 @@ try:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
     
-    from resources.resource_manager import resource_manager
-    from config.colors import colors, theme
+    from zhoutomo_client.resources.resource_manager import resource_manager
+    from zhoutomo_client.config.colors import colors, theme
 except ImportError:
     # 如果无法导入资源管理器，创建一个简单的替代版本
     class SimpleResourceManager:
@@ -35,8 +35,8 @@ except ImportError:
 
 # 导入自定义控件和对话框
 try:
-    from view.widgets import ClickableLabel
-    from view.dialogs import ConnectEMPopup, ImageCapturePopup, AutofocusSettingsPopup, AutoTiltSettingsPopup
+    from zhoutomo_client.ui.widgets import ClickableLabel
+    from zhoutomo_client.ui.dialogs import ConnectEMPopup, ImageCapturePopup, AutofocusSettingsPopup, AutoTiltSettingsPopup
 except ImportError:
     # 如果绝对导入失败，尝试相对导入
     try:

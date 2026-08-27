@@ -14,16 +14,16 @@ try:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
         
-    from resources.resource_manager import resource_manager
-    from config.colors import colors, theme
-    from agent_client import AgentClient, AgentClientError
-    from view.agent_manager import AgentClientManager
-    from model.targets import TargetModel, StagePose
-    from autofocus.config import AutofocusSettings
-    from autofocus.microscope_api import MicroscopeAPI
-    from autofocus.controller import AutofocusController
-    from autofocus.controller_advanced import AutofocusGoldenSearchController
-    from autotilt.controller import AutoTiltController, AutoTiltSettings
+    from zhoutomo_client.resources.resource_manager import resource_manager
+    from zhoutomo_client.config.colors import colors, theme
+    from zhoutomo_client.api import AgentClient, AgentClientError
+    from zhoutomo_client.ui.agent_manager import AgentClientManager
+    from zhoutomo_client.models.targets import TargetModel, StagePose
+    from zhoutomo_client.workflows.autofocus.config import AutofocusSettings
+    from zhoutomo_client.workflows.autofocus.microscope_api import MicroscopeAPI
+    from zhoutomo_client.workflows.autofocus.controller import AutofocusController
+    from zhoutomo_client.workflows.autofocus.controller_advanced import AutofocusGoldenSearchController
+    from zhoutomo_client.workflows.autotilt.controller import AutoTiltController, AutoTiltSettings
 except ImportError:
     # 如果无法导入资源管理器，创建一个简单的替代版本
     class SimpleResourceManager:
@@ -47,9 +47,9 @@ except ImportError:
 
 # 导入自定义控件和对话框
 try:
-    from view.widgets import ClickableLabel
-    from view.dialogs import ConnectEMPopup
-    from view.toolbar import MainToolbar
+    from zhoutomo_client.ui.widgets import ClickableLabel
+    from zhoutomo_client.ui.dialogs import ConnectEMPopup
+    from zhoutomo_client.ui.toolbar import MainToolbar
 except ImportError:
     # 如果绝对导入失败，尝试相对导入
     try:
@@ -965,7 +965,7 @@ class MainWindow(QMainWindow):
     # def open_autofocus_settings(self):
     #     """打开自动聚焦参数设置弹窗，并保存参数到数据模型"""
     #     try:
-    #         from view.dialogs import AutofocusSettingsPopup
+    #         from zhoutomo_client.ui.dialogs import AutofocusSettingsPopup
     #         dlg = AutofocusSettingsPopup(self)
     #         def on_selected(data):
     #             if not data:
@@ -1335,9 +1335,9 @@ class MainWindow(QMainWindow):
     def create_central_widget(self):
         """创建中央窗口部件（使用拆分后的面板组件）"""
         # 延迟导入，避免循环依赖
-        from view.panels.file_panel import FilePanel
-        from view.panels.image_panel import ImagePanel
-        from view.panels.info_panel import InfoPanel
+        from zhoutomo_client.ui.panels.file_panel import FilePanel
+        from zhoutomo_client.ui.panels.image_panel import ImagePanel
+        from zhoutomo_client.ui.panels.info_panel import InfoPanel
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         central_widget.setStyleSheet(f"background-color: {colors.LIGHT_BACKGROUND};")
@@ -1392,7 +1392,7 @@ class MainWindow(QMainWindow):
     
     def create_image_panel(self, parent):
         """已拆分为 panels/image_panel.ImagePanel。保留空壳以兼容旧调用（不再使用）。"""
-        from view.panels.image_panel import ImagePanel
+        from zhoutomo_client.ui.panels.image_panel import ImagePanel
         self.image_panel = ImagePanel()
         self.image_panel.selectionMade.connect(self._on_canvas_selection)
         parent.addWidget(self.image_panel)

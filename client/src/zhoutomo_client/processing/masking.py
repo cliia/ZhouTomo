@@ -1,3 +1,3 @@
 """Mask-generation compatibility facade."""
 
-from src.create_loose_mask import *
+from zhoutomo_client.processing.legacy.create_loose_mask import *

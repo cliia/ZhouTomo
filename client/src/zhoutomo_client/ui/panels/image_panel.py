@@ -40,7 +40,7 @@ class ImagePanel(QWidget):
         layout.setSpacing(6)
 
         # Matplotlib 画布
-        from view.image_canvas import ImageCanvas
+        from zhoutomo_client.ui.image_canvas import ImageCanvas
         self.image_canvas = ImageCanvas()
         self.image_canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.image_canvas.selectionMade.connect(self.selectionMade.emit)

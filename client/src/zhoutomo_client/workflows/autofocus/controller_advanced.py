@@ -5,11 +5,11 @@ from typing import Optional, Tuple, Dict
 import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from autofocus.config import AutofocusSettings
-from autofocus.microscope_api import MicroscopeAPI
-from model.targets import TargetModel
-from src.utils import get_definition, mag2ps
-from src.normxcorr2 import extract_pattern
+from zhoutomo_client.workflows.autofocus.config import AutofocusSettings
+from zhoutomo_client.workflows.autofocus.microscope_api import MicroscopeAPI
+from zhoutomo_client.models.targets import TargetModel
+from zhoutomo_client.processing.legacy.utils import get_definition, mag2ps
+from zhoutomo_client.processing.legacy.normxcorr2 import extract_pattern
 from scipy.interpolate import interp1d
 from scipy.ndimage import gaussian_filter1d
 import logging

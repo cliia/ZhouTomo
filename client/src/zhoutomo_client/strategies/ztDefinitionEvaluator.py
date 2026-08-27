@@ -1,6 +1,6 @@
 import numpy as np
-from model.ztImage import ZtImage
-from src.utils import get_definition
+from zhoutomo_client.models.ztImage import ZtImage
+from zhoutomo_client.processing.legacy.utils import get_definition
 
 
 class ZtDefinitionEvaluator:

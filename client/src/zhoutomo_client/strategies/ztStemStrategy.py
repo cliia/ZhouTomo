@@ -1,5 +1,5 @@
-from model.ztMicroscope import ZtBaseMicroscope
-from model.ztObject import ZtObject
+from zhoutomo_client.models.ztMicroscope import ZtBaseMicroscope
+from zhoutomo_client.models.ztObject import ZtObject
 
 
 class ZtStemStrategies:

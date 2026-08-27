@@ -1,7 +1,7 @@
 from skimage import morphology
 import numpy as np
 import cv2
-from src.utils import imrescale
+from zhoutomo_client.processing.legacy.utils import imrescale
 
 
 def bg_conv_gauss_corr(bg_mask: np.ndarray, convd, thresh) -> bool:
