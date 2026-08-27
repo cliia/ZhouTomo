@@ -1,5 +1,19 @@
-"""Public API client facade."""
+"""HTTP/WebSocket client for the ZhouTomo server."""
 
-from agent_client import AgentClient
+from .client import (
+    APIError,
+    AgentClient,
+    AgentClientError,
+    AuthenticationError,
+    ConnectionError,
+    WebSocketError,
+)
 
-__all__ = ["AgentClient"]
+__all__ = [
+    "APIError",
+    "AgentClient",
+    "AgentClientError",
+    "AuthenticationError",
+    "ConnectionError",
+    "WebSocketError",
+]

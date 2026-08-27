@@ -41,13 +41,12 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["main", "agent_client", "domain"]
 include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["zhoutomo_client*", "view*", "config*", "autofocus*", "autotilt*", "model*", "strategy*", "src*"]
+include = ["zhoutomo_client*"]
 
 [tool.setuptools.package-data]
-src = ["*.mat"]
-resources = ["**/*"]
+"zhoutomo_client.resources" = ["*.md", "background/*", "icons/*"]
+"zhoutomo_client.processing.legacy" = ["*.mat"]

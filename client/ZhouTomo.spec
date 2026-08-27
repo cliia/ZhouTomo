@@ -1,25 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-import sys
-from PyInstaller.utils.hooks import collect_submodules
-from PyInstaller.utils.hooks import collect_data_files
-from PyInstaller.utils.hooks import collect_all
-from PyInstaller.building.build_main import Tree
-
 block_cipher = None
 
-# 隐式依赖（通常 PyQt5 有 hook，这里留作保险）
 hiddenimports = [
-    'qasync',
+    "qasync",
 ]
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    ["packaging/pyinstaller_entry.py"],
+    pathex=["src"],
     binaries=[],
     datas=[
-        ('resources', 'resources'),   # 整个资源目录
-        ('src/*.mat', 'src'),         # BM3D 等算法所需 .mat
+        ("src/zhoutomo_client/resources", "zhoutomo_client/resources"),
+        (
+            "src/zhoutomo_client/processing/legacy/*.mat",
+            "zhoutomo_client/processing/legacy",
+        ),
     ],
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -29,7 +25,7 @@ a = Analysis(
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
-    noarchive=False
+    noarchive=False,
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
@@ -39,13 +35,13 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ZhouTomo',
+    name="ZhouTomo",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,                  # 控制台关闭；调试时可改为 True
-    icon='resources/icons/logo.ico' # exe 图标使用 ICO
+    console=False,
+    icon="src/zhoutomo_client/resources/icons/logo.ico",
 )
 
 coll = COLLECT(
@@ -56,5 +52,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='ZhouTomo'
+    name="ZhouTomo",
 )
